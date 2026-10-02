@@ -320,24 +320,27 @@ const CognitoAuth = (function() {
           return fallbackLocal();
         }
 
-        const userData = {
-          Username: cleanEmail,
-          Pool: userPool
-        };
-        const cognitoUser = new AmazonCognitoIdentity.CognitoUser(userData);
+        try {
+          const userData = {
+            Username: cleanEmail,
+            Pool: userPool
+          };
+          const cognitoUser = new AmazonCognitoIdentity.CognitoUser(userData);
 
-        cognitoUser.forgotPassword({
-          onSuccess: function(data) {
-            resolve({ success: true, message: 'Código de recuperação enviado para seu e-mail cadastrado.', data });
-          },
-          onFailure: function(err) {
-            // Em caso de usuário não encontrado no Cognito, tenta fallback local
-            fallbackLocal();
-          },
-          inputVerificationCode: function(data) {
-            resolve({ success: true, message: 'Código de verificação enviado para seu e-mail.', data, requiresCode: true });
-          }
-        });
+          cognitoUser.forgotPassword({
+            onSuccess: function(data) {
+              resolve({ success: true, message: 'Código de recuperação enviado para seu e-mail cadastrado.', data });
+            },
+            onFailure: function(err) {
+              fallbackLocal();
+            },
+            inputVerificationCode: function(data) {
+              resolve({ success: true, message: 'Código de verificação enviado para seu e-mail.', data, requiresCode: true });
+            }
+          });
+        } catch (e) {
+          fallbackLocal();
+        }
       });
     },
 
@@ -368,20 +371,24 @@ const CognitoAuth = (function() {
           return fallbackLocal();
         }
 
-        const userData = {
-          Username: cleanEmail,
-          Pool: userPool
-        };
-        const cognitoUser = new AmazonCognitoIdentity.CognitoUser(userData);
+        try {
+          const userData = {
+            Username: cleanEmail,
+            Pool: userPool
+          };
+          const cognitoUser = new AmazonCognitoIdentity.CognitoUser(userData);
 
-        cognitoUser.confirmPassword(cleanCode, cleanPass, {
-          onSuccess: function() {
-            resolve({ success: true, message: 'Sua senha foi redefinida com sucesso! Você já pode entrar no sistema.' });
-          },
-          onFailure: function(err) {
-            fallbackLocal();
-          }
-        });
+          cognitoUser.confirmPassword(cleanCode, cleanPass, {
+            onSuccess: function() {
+              resolve({ success: true, message: 'Sua senha foi redefinida com sucesso! Você já pode entrar no sistema.' });
+            },
+            onFailure: function(err) {
+              fallbackLocal();
+            }
+          });
+        } catch (e) {
+          fallbackLocal();
+        }
       });
     }
   };

@@ -549,8 +549,31 @@ const UserDB = (function() {
       if (!cleanEmail) throw new Error('Informe o e-mail cadastrado.');
 
       const users = loadUsersFromStorage();
-      const user = users.find(u => (u.email && u.email.toLowerCase() === cleanEmail) || (u.uid && u.uid.toLowerCase() === cleanEmail));
-      if (!user) throw new Error(`Nenhum usuário encontrado com o e-mail "${cleanEmail}".`);
+      let user = users.find(u => (u.email && u.email.toLowerCase() === cleanEmail) || (u.uid && u.uid.toLowerCase() === cleanEmail));
+      
+      if (!user) {
+        if (SUPER_ADMINS.includes(cleanEmail)) {
+          const nowIso = new Date().toISOString();
+          user = {
+            uid: 'admin-maxwell-001',
+            name: 'Maxwell Rodrigues Ferreira',
+            email: cleanEmail,
+            drogaria: 'Drogasil Mogilar',
+            passwordHash: '',
+            passwordSalt: '',
+            role: 'admin',
+            status: 'approved',
+            createdAt: nowIso,
+            updatedAt: nowIso,
+            approvedAt: nowIso,
+            approvedBy: 'system',
+            auditLog: []
+          };
+          users.push(user);
+        } else {
+          throw new Error(`O e-mail "${cleanEmail}" ainda não possui cadastro no sistema. Clique na aba "📝 Solicitar Cadastro" para criar sua conta.`);
+        }
+      }
 
       const code = Math.floor(100000 + Math.random() * 900000).toString();
       const expires = Date.now() + 15 * 60 * 1000; // 15 minutos
