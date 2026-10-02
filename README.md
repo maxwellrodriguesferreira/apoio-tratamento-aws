@@ -136,19 +136,27 @@ O sistema suporta a inteligência artificial generativa **Gemini 3.6 Flash** par
 
 ---
 
+## 🔒 Privacidade & Proteção de Dados (LGPD)
+
+- **Configuração Exclusiva da API:** Apenas a chave de API do Gemini da aplicação é gerenciada.
+- **Zero Dados de Clientes no Banco:** Nomes, telefones, medicamentos, posologias ou mensagens geradas **NUNCA** são gravados em bancos de dados na nuvem ou externos.
+- **Processamento Volátil em Tempo Real:** O processamento com IA utiliza apenas os parâmetros em tempo de execução para redação da mensagem.
+
+---
+
 ## 📂 Arquitetura do Projeto
 
-A aplicação é 100% estática, construída com JavaScript modular moderno (ES6+), CSS com variáveis e integração nativa com o Firebase:
+A aplicação é 100% estática, construída com JavaScript modular moderno (ES6+), CSS com variáveis e hospedada na AWS Amplify:
 
 | Arquivo | Descrição e Responsabilidade |
 | :--- | :--- |
 | [`index.html`](file:///home/maxwell/terminal/index.html) | Estrutura semântica da aplicação, tela CRT, modais, formulários de autenticação/cadastro e painel administrativo. |
 | [`style.css`](file:///home/maxwell/terminal/style.css) | Design system CRT, scanlines, 4 temas visuais, badges de status, fila de envio em lote e responsividade mobile. |
 | [`app.js`](file:///home/maxwell/terminal/app.js) | Núcleo da CLI, motor de geração de mensagens, fila de disparos para WhatsApp, moderação RBAC e integração Gemini. |
-| [`firebase-config.js`](file:///home/maxwell/terminal/firebase-config.js) | Inicialização do SDK Firebase (Auth & Firestore), persistência de sessão e operações de sincronização em nuvem. |
-| [`firestore.rules`](file:///home/maxwell/terminal/firestore.rules) | Regras de segurança RBAC e proteção das coleções do Cloud Firestore. |
+| [`app-config.js`](file:///home/maxwell/terminal/app-config.js) | Configuração central da aplicação e gestão segura da chave de API do Gemini. |
+| [`amplify.yml`](file:///home/maxwell/terminal/amplify.yml) | Especificação de build e deploy contínuo do AWS Amplify Hosting. |
+| [`customHttp.yml`](file:///home/maxwell/terminal/customHttp.yml) | Cabeçalhos de segurança HTTP (Cache-Control, X-Frame-Options, X-Content-Type-Options, etc.). |
 | [`test.js`](file:///home/maxwell/terminal/test.js) | Suíte completa de testes automatizados (parsers de IA, validações RBAC, URLs de WhatsApp e integridade). |
-| [`firebase.json`](file:///home/maxwell/terminal/firebase.json) | Configuração de rotas, cache e cabeçalhos de segurança HTTP do Firebase Hosting. |
 
 ---
 
@@ -164,37 +172,33 @@ python3 -m http.server 8080
 
 Acesse [http://localhost:8080](http://localhost:8080) no navegador.
 
-Para executar a suíte automatizada de validação estática e testes de integração:
+Para executar a suíte automatizada de validação:
 
 ```bash
-# Validação de sintaxe e execução dos testes automatizados
-node --check firebase-config.js
+node --check app-config.js
 node --check app.js
 node test.js
-git diff --check
 ```
 
 ---
 
-## 🚀 Publicação e Deploy (Firebase)
+## 🚀 Publicação e Deploy (AWS Amplify)
 
-Para publicar atualizações em produção:
+Cada alteração enviada para a branch `main` é automaticamente construída e publicada pelo AWS Amplify Hosting:
 
 ```bash
-cd /home/maxwell/terminal
-
-# Deploy completo (Hosting e Regras do Firestore)
-firebase deploy --project terminal-apoio
-
-# Deploy exclusivo de Hosting (Front-end)
-firebase deploy --only hosting --project terminal-apoio
-
-# Deploy exclusivo de Regras do Firestore
-firebase deploy --only firestore:rules --project terminal-apoio
+git add .
+git commit -m "feat: sua alteracao em portugues"
+git push
 ```
+
+Para injetar a chave da API do Gemini automaticamente durante o build da AWS:
+1. No console do **AWS Amplify**, vá em **App settings > Environment variables**.
+2. Adicione a variável `GEMINI_API_KEY` com o valor da sua chave.
+3. O script do `amplify.yml` injetará a chave automaticamente na aplicação a cada deploy.
 
 ---
 
 ## 📌 Versão
 
-**3.3.0** — Implementação do sistema completo de controle de acesso baseado em funções (RBAC), moderação com múltiplos status, trilha de auditoria detalhada, painel de fila de envio em lote para WhatsApp com temporizador e barra de progresso, comando de identificação e autoria de Maxwell Rodrigues Ferreira (Farmacêutico CRF-SP nº 86426), regras de segurança no Firestore e suporte ao Google Gemini 3.6 Flash.
+**4.0.0-AWS** — Migração para AWS Amplify Hosting, centralização da configuração do Google Gemini via `app-config.js` com suporte a variáveis de ambiente da AWS, eliminação de dependências do Firebase e garantia de 0 persistência de dados de clientes em banco de dados.

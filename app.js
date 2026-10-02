@@ -2046,11 +2046,35 @@ function generateMessages(params) {
 }
 
 /* ==========================================================================
-   INTEGRAÇÃO DE IA (GOOGLE GEMINI 3.6 FLASH)
+   INTEGRAÇÃO DE IA (GOOGLE GEMINI FLASH)
+   POLÍTICA DE PRIVACIDADE:
+   - Apenas a API Key do Gemini é salva nas configurações da aplicação.
+   - 0 dados de clientes ou pacientes são persistidos em bancos de dados.
    ========================================================================== */
 
-const GEMINI_MODEL = 'gemini-3.6-flash';
-const GEMINI_MODEL_LABEL = 'Gemini 3.6 Flash';
+function getGeminiApiKey() {
+  if (typeof window !== 'undefined' && window.AppConfig && typeof window.AppConfig.getGeminiApiKey === 'function') {
+    const key = window.AppConfig.getGeminiApiKey();
+    if (key) return key;
+  }
+  return (typeof localStorage !== 'undefined' ? localStorage.getItem('apoio_gemini_api_key') : '') || '';
+}
+
+function saveGeminiApiKey(key) {
+  if (typeof window !== 'undefined' && window.AppConfig && typeof window.AppConfig.setGeminiApiKey === 'function') {
+    window.AppConfig.setGeminiApiKey(key);
+  } else if (typeof localStorage !== 'undefined') {
+    if (key) localStorage.setItem('apoio_gemini_api_key', key);
+    else localStorage.removeItem('apoio_gemini_api_key');
+  }
+}
+
+function removeGeminiApiKey() {
+  saveGeminiApiKey('');
+}
+
+const GEMINI_MODEL = (typeof window !== 'undefined' && window.AppConfig && typeof window.AppConfig.getGeminiModel === 'function') ? window.AppConfig.getGeminiModel() : 'gemini-2.5-flash';
+const GEMINI_MODEL_LABEL = 'Google Gemini Flash';
 const GEMINI_RESPONSE_SCHEMA = {
   type: 'OBJECT',
   properties: {
@@ -2139,9 +2163,9 @@ function getGeminiEndpoint(apiKey) {
 }
 
 async function callGeminiAPI(promptText, customSchema = null) {
-  const apiKey = localStorage.getItem('apoio_gemini_api_key') || '';
+  const apiKey = getGeminiApiKey();
   if (!apiKey) {
-    throw new Error("Chave de API do Gemini não configurada. Digite 'apikey SUACHAVE' no terminal.");
+    throw new Error("Chave de API do Gemini não configurada. Digite 'apikey SUACHAVE' no terminal ou configure no painel.");
   }
 
   const endpoint = getGeminiEndpoint(apiKey);
@@ -2400,7 +2424,7 @@ JSON EXATO:
 }
 
 async function generateMessagesSmart(params) {
-  const apiKey = localStorage.getItem('apoio_gemini_api_key');
+  const apiKey = getGeminiApiKey();
   if (!apiKey) {
     return generateMessages(params);
   }
@@ -2435,7 +2459,7 @@ function capitalizeName(name) {
 
 function updateAIStatus() {
   const statusEl = document.getElementById('ai-status');
-  const key = localStorage.getItem('apoio_gemini_api_key');
+  const key = getGeminiApiKey();
   if (statusEl) {
     if (key && !isGeminiTemporarilyBlocked()) {
       statusEl.innerHTML = `🟢 <strong>Gemini IA Ativa</strong>`;
@@ -2499,7 +2523,7 @@ function closeGeminiConfigPanel() {
 }
 
 function renderGeminiConfigState() {
-  const key = localStorage.getItem('apoio_gemini_api_key') || '';
+  const key = getGeminiApiKey();
   const status = document.getElementById('geminiConfigStatus');
   const input = document.getElementById('geminiKeyInput');
   const removeButton = document.getElementById('geminiRemoveBtn');
@@ -2545,16 +2569,16 @@ function handleGeminiSave(event) {
     return;
   }
 
-  localStorage.setItem('apoio_gemini_api_key', key);
+  saveGeminiApiKey(key);
   updateAIStatus();
   renderGeminiConfigState();
-  setGeminiConfigFeedback('Chave salva neste navegador. Clique em “Testar conexão” para validá-la.', 'success');
-  appendLog(`🔑 <strong>Chave do Gemini IA salva com sucesso!</strong>`, 'log-success');
+  setGeminiConfigFeedback('Chave salva nas configurações da aplicação. Clique em “Testar conexão” para validá-la.', 'success');
+  appendLog(`🔑 <strong>Chave do Gemini IA salva com sucesso nas configurações!</strong>`, 'log-success');
 }
 
 async function handleGeminiTest() {
   const input = document.getElementById('geminiKeyInput');
-  const testKey = input?.value.trim() || localStorage.getItem('apoio_gemini_api_key') || '';
+  const testKey = input?.value.trim() || getGeminiApiKey();
 
   if (!testKey) {
     setGeminiConfigFeedback('Cole ou salve uma chave antes de testar a conexão.', 'error');
@@ -2588,11 +2612,11 @@ async function handleGeminiTest() {
 }
 
 function handleGeminiRemove() {
-  localStorage.removeItem('apoio_gemini_api_key');
+  removeGeminiApiKey();
   updateAIStatus();
   renderGeminiConfigState();
-  setGeminiConfigFeedback('Chave removida deste navegador. O gerador local continuará disponível.', 'warning');
-  appendLog(`🗑️ Chave do Gemini IA removida. O sistema voltou ao modo de geração local.`, 'log-warning');
+  setGeminiConfigFeedback('Chave removida da aplicação. O gerador local continuará disponível.', 'warning');
+  appendLog(`🗑️ Chave do Gemini IA removida das configurações. O sistema voltou ao modo de geração local.`, 'log-warning');
 }
 /**
  * Exibe o resultado da geração com cards e botões de ação rápidos
@@ -3247,7 +3271,7 @@ FORMATO JSON EXATO:
 }
 
 async function generateBatchMessagesSmart(items, options = {}) {
-  const apiKey = localStorage.getItem('apoio_gemini_api_key');
+  const apiKey = getGeminiApiKey();
   const forceLocal = options.useAI === false || options.forceLocal === true;
 
   if (!apiKey || forceLocal) {
@@ -3302,7 +3326,7 @@ function saveInlineBatchGeminiKey() {
     appendLog('⚠️ Por favor, informe uma chave de API válida.', 'log-warning');
     return;
   }
-  localStorage.setItem('apoio_gemini_api_key', key);
+  saveGeminiApiKey(key);
   resetGeminiFailureState();
   updateAIStatus();
   appendLog('✨ Chave do Gemini configurada com sucesso! IA ativada no painel em lote.', 'log-success');
@@ -3310,7 +3334,7 @@ function saveInlineBatchGeminiKey() {
 }
 
 function startBatchWizard() {
-  const hasApiKey = Boolean(localStorage.getItem('apoio_gemini_api_key'));
+  const hasApiKey = Boolean(getGeminiApiKey());
   const isBlocked = isGeminiTemporarilyBlocked();
   const isAiActive = hasApiKey && !isBlocked;
 
@@ -3460,7 +3484,7 @@ async function handleBatchSubmit(e) {
   }
 
   const useAiCheckbox = document.getElementById('batchUseAiCheckbox');
-  const useAI = useAiCheckbox ? useAiCheckbox.checked : Boolean(localStorage.getItem('apoio_gemini_api_key'));
+  const useAI = useAiCheckbox ? useAiCheckbox.checked : Boolean(getGeminiApiKey());
   const tomSelect = document.getElementById('batchAiToneSelect');
   const tom = tomSelect ? tomSelect.value : 'equilibrado';
   const customInstructionInput = document.getElementById('batchCustomInstruction');
@@ -3766,7 +3790,7 @@ async function regenerateBatchItemWithAI(batchId, itemIdx) {
   if (!batchList || !batchList[itemIdx]) return;
   const item = batchList[itemIdx];
 
-  const apiKey = localStorage.getItem('apoio_gemini_api_key');
+  const apiKey = getGeminiApiKey();
   if (!apiKey) {
     appendLog('⚠️ Configure uma chave de API do Gemini para regenerar com inteligência artificial.', 'log-warning');
     openGeminiConfigPanel();
@@ -3890,7 +3914,7 @@ async function regenerateEntireBatchWithAI(batchId) {
   const batchList = window.batchMessagesStore[batchId] || window[`batch_data_${batchId}`];
   if (!batchList || batchList.length === 0) return;
 
-  const apiKey = localStorage.getItem('apoio_gemini_api_key');
+  const apiKey = getGeminiApiKey();
   if (!apiKey) {
     appendLog('⚠️ Configure uma chave de API do Gemini para processar com inteligência artificial.', 'log-warning');
     openGeminiConfigPanel();
@@ -4269,10 +4293,10 @@ async function executeCommand(inputCmd) {
     case 'key':
     case 'chave':
       if (parts[1]) {
-        localStorage.setItem('apoio_gemini_api_key', parts[1].trim());
+        saveGeminiApiKey(parts[1].trim());
         resetGeminiFailureState();
         updateAIStatus();
-        appendLog(`✨ Chave da API do Google Gemini configurada com sucesso!`, 'log-success');
+        appendLog(`✨ Chave da API do Google Gemini configurada com sucesso nas configurações!`, 'log-success');
       } else {
         openGeminiConfigPanel();
       }

@@ -3,9 +3,9 @@ const fs = require('fs');
 const app = fs.readFileSync('/home/maxwell/terminal/app.js', 'utf8');
 const html = fs.readFileSync('/home/maxwell/terminal/index.html', 'utf8');
 const css = fs.readFileSync('/home/maxwell/terminal/style.css', 'utf8');
-const rules = fs.readFileSync('/home/maxwell/terminal/firestore.rules', 'utf8');
-const firebaseConfig = fs.readFileSync('/home/maxwell/terminal/firebase-config.js', 'utf8');
-const firebaseJson = fs.readFileSync('/home/maxwell/terminal/firebase.json', 'utf8');
+const appConfig = fs.readFileSync('/home/maxwell/terminal/app-config.js', 'utf8');
+const amplifyYml = fs.readFileSync('/home/maxwell/terminal/amplify.yml', 'utf8');
+const customHttp = fs.readFileSync('/home/maxwell/terminal/customHttp.yml', 'utf8');
 
 // =========================================================================
 // 1. TESTES ESTRUTURAIS DO PAINEL GEMINI & UI BÁSICA
@@ -16,12 +16,10 @@ const requirements = [
   ['campo da chave', html.includes('id="geminiKeyInput"')],
   ['inicialização do painel', app.includes('function initializeGeminiConfigPanel()')],
   ['abertura do painel', app.includes('function openGeminiConfigPanel()')],
-  ['armazenamento local', app.includes("localStorage.setItem('apoio_gemini_api_key'")],
+  ['armazenamento com AppConfig', appConfig.includes('getGeminiApiKey') && appConfig.includes('setGeminiApiKey')],
   ['estilos do painel', css.includes('.gemini-config-panel')],
-  ['sem painel dinâmico legado', !app.includes('gemini-config-panel')],
   ['sem dependência de dialog', !app.includes('.showModal()')],
-  ['modelo Gemini 3.6 Flash', app.includes("const GEMINI_MODEL = 'gemini-3.6-flash'")],
-  ['rótulo Gemini 3.6 Flash', app.includes("const GEMINI_MODEL_LABEL = 'Gemini 3.6 Flash'")],
+  ['modelo Gemini configurado', appConfig.includes('geminiModel')],
   ['parser defensivo do JSON da IA', app.includes('function sanitizeGeminiJsonResponse')],
   ['força JSON da API Gemini', app.includes("responseMimeType: 'application/json'")],
   ['schema estruturado do Gemini', app.includes('GEMINI_RESPONSE_SCHEMA')],
@@ -39,8 +37,9 @@ const requirements = [
   ['função de inicialização de autenticação', app.includes('function initializeAuth()')],
   ['função de validação de login', app.includes('function handleLoginSubmit(')],
   ['função de encerramento de sessão', app.includes('function logoutUser()')],
-  ['script firebase-config no HTML', html.includes('firebase-config.js')],
-  ['script firebase auth no HTML', html.includes('firebase-auth-compat.js')]
+  ['script app-config no HTML', html.includes('app-config.js')],
+  ['headers de segurança no customHttp.yml', customHttp.includes('nosniff') && customHttp.includes('SAMEORIGIN')],
+  ['build do amplify configurado', amplifyYml.includes('baseDirectory: .')]
 ];
 
 const failed = requirements.filter(([, passed]) => !passed).map(([name]) => name);
@@ -136,13 +135,9 @@ const userRequirements = [
   ['comando CLI desbloquear no JS', app.includes("case 'desbloquear':")],
   ['comando CLI role no JS', app.includes("case 'role':")],
   ['comando CLI deletar no JS', app.includes("case 'deletar':")],
-  ['funções de moderação em firebase-config.js', firebaseConfig.includes('firestoreApproveUser') && firebaseConfig.includes('firestoreRejectUser') && firebaseConfig.includes('firestoreBlockUser') && firebaseConfig.includes('firestoreUnblockUser')],
-  ['regras de segurança isAdmin em firestore.rules', rules.includes('function isAdmin()')],
-  ['regras de segurança isApprovedUser em firestore.rules', rules.includes('function isApprovedUser()')],
-  ['regras bloqueiam escrita para não aprovados', rules.includes('allow read, write: if isAuthenticated() && isApprovedUser();')],
-  ['cabeçalho X-Content-Type-Options no firebase.json', firebaseJson.includes('"nosniff"')],
-  ['cabeçalho X-Frame-Options no firebase.json', firebaseJson.includes('"SAMEORIGIN"')],
-  ['cabeçalho Referrer-Policy no firebase.json', firebaseJson.includes('strict-origin-when-cross-origin')],
+  ['cabeçalho X-Content-Type-Options no customHttp.yml', customHttp.includes('nosniff')],
+  ['cabeçalho X-Frame-Options no customHttp.yml', customHttp.includes('SAMEORIGIN')],
+  ['cabeçalho Referrer-Policy no customHttp.yml', customHttp.includes('strict-origin-when-cross-origin')],
   ['função de cópia segura de lote no JS', app.includes('function copyBatchItemText(')],
   ['função de abertura segura de WhatsApp em lote no JS', app.includes('function openBatchItemWhatsApp(')],
   ['função de regeneração individual com IA no JS', app.includes('function regenerateBatchItemWithAI(')],
@@ -467,7 +462,7 @@ console.log('✅ Todos os testes de controle de acesso, moderação (aprovar, re
     ${app.match(/function classifyItem\([\s\S]*?\n\}/)?.[0] || ''}
     ${app.match(/function simpleStringHash\([\s\S]*?\n\}/)?.[0] || ''}
     ${app.match(/function generateUniqueAntiSpamMessage\([\s\S]*?\n\}/)?.[0] || ''}
-    ${app.match(/const GEMINI_MODEL = 'gemini-3.6-flash';[\s\S]*?\n\}\n\nfunction sanitizeGeminiJsonResponse/)?.[0]?.replace(/\nfunction sanitizeGeminiJsonResponse$/, '') || ''}
+    ${app.match(/function getGeminiApiKey\(\)[\s\S]*?\n\}\n\nfunction sanitizeGeminiJsonResponse/)?.[0]?.replace(/\nfunction sanitizeGeminiJsonResponse$/, '') || ''}
     ${app.match(/function sanitizeGeminiBatchJsonResponse\([\s\S]*?\n\}/)?.[0] || ''}
     ${app.match(/async function generateBatchMessagesAI\([\s\S]*?\n\}/)?.[0] || ''}
     ${app.match(/async function generateBatchMessagesSmart\([\s\S]*?\n\}/)?.[0] || ''}
