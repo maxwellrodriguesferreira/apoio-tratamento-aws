@@ -443,9 +443,11 @@
     </div>
   </section>
 
-  <!-- Configuração da Aplicação, Banco de Dados de Usuários & Google Gemini -->
-  <script src="app-config.js?v=20261002-aws-v1"></script>
-  <script src="user-db.js?v=20261002-aws-v1"></script>
-  <script src="app.js?v=20261002-aws-v1"></script>
+  <!-- AWS Cognito SDK & Módulos da Aplicação -->
+  <script src="https://cdn.jsdelivr.net/npm/amazon-cognito-identity-js@6.3.12/dist/amazon-cognito-identity.min.js"></script>
+  <script src="app-config.js?v=20261002-aws-v2"></script>
+  <script src="cognito-auth.js?v=20261002-aws-v2"></script>
+  <script src="user-db.js?v=20261002-aws-v2"></script>
+  <script src="app.js?v=20261002-aws-v2"></script>
 </body>
 </html>

@@ -4,6 +4,11 @@ frontend:
     build:
       commands:
         - if [ -n "$GEMINI_API_KEY" ]; then sed -i "s/GEMINI_API_KEY_PLACEHOLDER/$GEMINI_API_KEY/g" app-config.js; fi
+        - if [ -n "$COGNITO_REGION" ]; then sed -i "s/COGNITO_REGION_PLACEHOLDER/$COGNITO_REGION/g" app-config.js; fi
+        - if [ -n "$COGNITO_USER_POOL_ID" ]; then sed -i "s/COGNITO_USER_POOL_ID_PLACEHOLDER/$COGNITO_USER_POOL_ID/g" app-config.js; fi
+        - if [ -n "$COGNITO_CLIENT_ID" ]; then sed -i "s/COGNITO_CLIENT_ID_PLACEHOLDER/$COGNITO_CLIENT_ID/g" app-config.js; fi
+        - if [ -n "$ADMIN_USER" ]; then sed -i "s/ADMIN_USER_PLACEHOLDER/$ADMIN_USER/g" app-config.js; fi
+        - if [ -n "$ADMIN_PASSWORD" ]; then sed -i "s/ADMIN_PASSWORD_PLACEHOLDER/$ADMIN_PASSWORD/g" app-config.js; fi
   artifacts:
     baseDirectory: .
     files:

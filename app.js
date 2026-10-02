@@ -495,7 +495,10 @@ async function handleRegisterSubmit(e) {
     const users = getRegisteredUsers();
     let newUser = null;
 
-    if (typeof window !== 'undefined' && window.UserDB && typeof window.UserDB.registerUser === 'function') {
+    // 1. Tenta cadastro no AWS Cognito se disponível
+    if (typeof window !== 'undefined' && window.CognitoAuth && typeof window.CognitoAuth.signUp === 'function') {
+      newUser = await window.CognitoAuth.signUp(name, email, drogaria, pass);
+    } else if (typeof window !== 'undefined' && window.UserDB && typeof window.UserDB.registerUser === 'function') {
       newUser = await window.UserDB.registerUser(name, email, drogaria, pass);
     } else {
       const isExplicitSuper = SUPER_ADMIN_EMAILS.includes(email);
@@ -594,10 +597,13 @@ async function handleLoginSubmit(e) {
     const remember = rememberCheckbox ? rememberCheckbox.checked : true;
     let authResult = null;
 
-    if (typeof window !== 'undefined' && window.UserDB && typeof window.UserDB.authenticateUser === 'function') {
+    // 1. Tenta autenticação via AWS Cognito
+    if (typeof window !== 'undefined' && window.CognitoAuth && typeof window.CognitoAuth.signIn === 'function') {
+      authResult = await window.CognitoAuth.signIn(rawUser, rawPass);
+    } else if (typeof window !== 'undefined' && window.UserDB && typeof window.UserDB.authenticateUser === 'function') {
       authResult = await window.UserDB.authenticateUser(rawUser, rawPass);
     } else {
-      // Fallback local caso UserDB não instanciado
+      // Fallback local caso módulos externos não instanciados
       if (rawUser.toLowerCase() === DEFAULT_AUTH.user && rawPass === DEFAULT_AUTH.pass) {
         authResult = {
           user: { uid: 'admin-master-001', name: DEFAULT_AUTH.name, email: 'admin@sistema.local', role: 'admin', status: 'approved' },
@@ -627,7 +633,7 @@ async function handleLoginSubmit(e) {
       role: isSuper ? 'admin' : normalizeRole(authenticatedUser.role || 'user'),
       status: 'approved',
       uid: authenticatedUser.uid || 'usr_' + Date.now(),
-      authType: 'database',
+      authType: authenticatedUser.provider || 'aws-cognito',
       loginTime: new Date().toISOString()
     };
 

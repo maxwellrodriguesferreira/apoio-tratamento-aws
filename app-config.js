@@ -15,6 +15,16 @@ const APP_CONFIG = {
   // Modelo padrão do Google Gemini
   geminiModel: "gemini-2.5-flash",
   
+  // Configurações do AWS Cognito User Pools (Injetadas via AWS Amplify Environment Variables)
+  cognitoRegion: "COGNITO_REGION_PLACEHOLDER",
+  cognitoUserPoolId: "COGNITO_USER_POOL_ID_PLACEHOLDER",
+  cognitoClientId: "COGNITO_CLIENT_ID_PLACEHOLDER",
+
+  // Administrador Master da Aplicação (Configurável via AWS Amplify Environment Variables: ADMIN_USER e ADMIN_PASSWORD)
+  adminUser: "ADMIN_USER_PLACEHOLDER",
+  adminPassword: "ADMIN_PASSWORD_PLACEHOLDER",
+  adminName: "Administrador Master",
+
   // Identificação do Sistema
   appName: "Terminal de Apoio ao Tratamento",
   unitName: "Drogasil Mogilar",
@@ -65,6 +75,39 @@ const AppConfig = {
   isGeminiConfigured: function() {
     const key = this.getGeminiApiKey();
     return Boolean(key && key.length > 10 && !key.includes('PLACEHOLDER'));
+  },
+
+  /**
+   * Obtém as configurações do AWS Cognito
+   */
+  getCognitoConfig: function() {
+    return {
+      region: (APP_CONFIG.cognitoRegion && !APP_CONFIG.cognitoRegion.includes('PLACEHOLDER')) ? APP_CONFIG.cognitoRegion.trim() : 'us-east-1',
+      userPoolId: (APP_CONFIG.cognitoUserPoolId && !APP_CONFIG.cognitoUserPoolId.includes('PLACEHOLDER')) ? APP_CONFIG.cognitoUserPoolId.trim() : '',
+      clientId: (APP_CONFIG.cognitoClientId && !APP_CONFIG.cognitoClientId.includes('PLACEHOLDER')) ? APP_CONFIG.cognitoClientId.trim() : ''
+    };
+  },
+
+  /**
+   * Verifica se o AWS Cognito foi preenchido com credenciais reais da AWS
+   */
+  isCognitoConfigured: function() {
+    const cfg = this.getCognitoConfig();
+    return Boolean(cfg.userPoolId && cfg.clientId && !cfg.userPoolId.includes('PLACEHOLDER') && !cfg.clientId.includes('PLACEHOLDER'));
+  },
+
+  /**
+   * Obtém as credenciais padrão do Administrador Master configuradas
+   */
+  getAdminCredentials: function() {
+    const user = (APP_CONFIG.adminUser && !APP_CONFIG.adminUser.includes('PLACEHOLDER')) 
+      ? APP_CONFIG.adminUser.trim() 
+      : 'admin';
+    const pass = (APP_CONFIG.adminPassword && !APP_CONFIG.adminPassword.includes('PLACEHOLDER')) 
+      ? APP_CONFIG.adminPassword.trim() 
+      : 'admin123';
+    const name = APP_CONFIG.adminName || 'Administrador Master';
+    return { user, pass, name };
   },
 
   /**
