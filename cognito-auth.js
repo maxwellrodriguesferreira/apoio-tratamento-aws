@@ -301,14 +301,23 @@ const CognitoAuth = (function() {
         const cleanEmail = String(email || '').trim().toLowerCase();
         if (!cleanEmail) return reject(new Error('Informe o e-mail cadastrado.'));
 
-        const userPool = getCognitoPool();
-        if (!userPool) {
+        const fallbackLocal = () => {
           if (typeof window !== 'undefined' && window.UserDB && typeof window.UserDB.requestPasswordReset === 'function') {
             return window.UserDB.requestPasswordReset(cleanEmail)
               .then(resolve)
-              .catch(reject);
+              .catch(err => {
+                const msg = err.message && err.message.includes('Nenhum usuário')
+                  ? `O e-mail "${cleanEmail}" ainda não possui cadastro no sistema. Clique na aba "📝 Solicitar Cadastro" para criar sua conta.`
+                  : (err.message || 'Falha ao solicitar recuperação.');
+                reject(new Error(msg));
+              });
           }
-          return reject(new Error('Serviço de recuperação indisponível.'));
+          return reject(new Error(`O e-mail "${cleanEmail}" ainda não possui cadastro no sistema. Clique na aba "📝 Solicitar Cadastro" para criar sua conta.`));
+        };
+
+        const userPool = getCognitoPool();
+        if (!userPool) {
+          return fallbackLocal();
         }
 
         const userData = {
@@ -322,13 +331,8 @@ const CognitoAuth = (function() {
             resolve({ success: true, message: 'Código de recuperação enviado para seu e-mail cadastrado.', data });
           },
           onFailure: function(err) {
-            let msg = err.message || 'Falha ao solicitar recuperação de senha.';
-            if (err.code === 'UserNotFoundException') {
-              msg = `Nenhum usuário encontrado com o e-mail "${cleanEmail}".`;
-            }
-            const error = new Error(msg);
-            error.code = err.code;
-            reject(error);
+            // Em caso de usuário não encontrado no Cognito, tenta fallback local
+            fallbackLocal();
           },
           inputVerificationCode: function(data) {
             resolve({ success: true, message: 'Código de verificação enviado para seu e-mail.', data, requiresCode: true });
@@ -350,14 +354,18 @@ const CognitoAuth = (function() {
           return reject(new Error('Todos os campos são obrigatórios.'));
         }
 
-        const userPool = getCognitoPool();
-        if (!userPool) {
+        const fallbackLocal = () => {
           if (typeof window !== 'undefined' && window.UserDB && typeof window.UserDB.confirmPasswordReset === 'function') {
             return window.UserDB.confirmPasswordReset(cleanEmail, cleanCode, cleanPass)
               .then(resolve)
               .catch(reject);
           }
           return reject(new Error('Serviço de recuperação indisponível.'));
+        };
+
+        const userPool = getCognitoPool();
+        if (!userPool) {
+          return fallbackLocal();
         }
 
         const userData = {
@@ -371,15 +379,7 @@ const CognitoAuth = (function() {
             resolve({ success: true, message: 'Sua senha foi redefinida com sucesso! Você já pode entrar no sistema.' });
           },
           onFailure: function(err) {
-            let msg = err.message || 'Falha ao redefinir a senha.';
-            if (err.code === 'CodeMismatchException') {
-              msg = 'Código de verificação incorreto ou inválido.';
-            } else if (err.code === 'ExpiredCodeException') {
-              msg = 'O código de verificação expirou. Solicite um novo.';
-            }
-            const error = new Error(msg);
-            error.code = err.code;
-            reject(error);
+            fallbackLocal();
           }
         });
       });
