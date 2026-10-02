@@ -2,11 +2,11 @@
 
 **Projeto Pessoal e Independente · Criado e Desenvolvido por Maxwell Rodrigues Ferreira (Farmacêutico CRF-SP nº 86426 & Desenvolvedor Web)**
 
-Aplicação web estática com interface retrô de terminal CRT para redação humanizada, acolhedora e personalizada de mensagens de acompanhamento farmacêutico, adesão terapêutica e pós-atendimento clínico em português do Brasil. Conta com processamento de mensagens individuais e em lote, fila interativa de envios para WhatsApp com proteção anti-spam, autenticação e controle de acesso baseado em funções (RBAC), painel administrativo com trilha de auditoria, regras de segurança no Cloud Firestore e integração com inteligência artificial via Google Gemini 3.6 Flash.
+Aplicação web estática com interface retrô de terminal CRT para redação humanizada, acolhedora e personalizada de mensagens de acompanhamento farmacêutico, adesão terapêutica e pós-atendimento clínico em português do Brasil. Conta com processamento de mensagens individuais e em lote, fila interativa de envios para WhatsApp com proteção anti-spam, autenticação e controle de acesso baseado em funções (RBAC), painel administrativo com trilha de auditoria, cabeçalhos de segurança na AWS Amplify e integração com inteligência artificial via Google Gemini Flash.
 
-- **URL de Produção:** [terminal-apoio.web.app](https://terminal-apoio.web.app)
-- **Projeto Firebase:** `terminal-apoio`
-- **Modelo de IA Generativa:** Google **Gemini 3.6 Flash** (`gemini-3.6-flash`)
+- **Repositório GitHub:** [`maxwellrodriguesferreira/apoio-tratamento-aws`](https://github.com/maxwellrodriguesferreira/apoio-tratamento-aws)
+- **Hospedagem & CI/CD:** **AWS Amplify Hosting**
+- **Modelo de IA Generativa:** Google **Gemini Flash**
 - **Autor & Responsável Técnico:** Maxwell Rodrigues Ferreira · Farmacêutico CRF-SP nº 86426 & Desenvolvedor Web
 
 > [!IMPORTANT]
@@ -80,21 +80,20 @@ Aplicação web estática com interface retrô de terminal CRT para redação hu
 
 ---
 
-### 🛡️ 5. Segurança & Cloud Firestore (`firestore.rules`)
-- **Regras RBAC no Firestore**: Funções `isAdmin()` e `isApprovedUser()` validam autorização no servidor a cada requisição.
-- **Imutabilidade de Permissões**: Usuários comuns não podem alterar papéis ou auto-aprovar cadastros.
-- **Headers HTTP Seguros (`firebase.json`)**: Configuração de `X-Content-Type-Options: nosniff`, `X-Frame-Options: SAMEORIGIN` e `Referrer-Policy: strict-origin-when-cross-origin`.
+### 🛡️ 5. Segurança & Cabeçalhos HTTP (`customHttp.yml`)
+- **Headers HTTP Seguros no AWS Amplify**: Configuração de `X-Content-Type-Options: nosniff`, `X-Frame-Options: SAMEORIGIN`, `X-XSS-Protection: 1; mode=block` e `Referrer-Policy: strict-origin-when-cross-origin`.
+- **Permissions-Policy Restritiva**: Bloqueio de acesso a microfone, câmera e geolocalização.
+- **Imutabilidade e Integridade Local**: Validação de integridade de sessões locais e controle de super-usuário.
 
 ---
 
-## 🧠 Integração com Google Gemini 3.6 Flash
+## 🧠 Integração com Google Gemini Flash
 
-O sistema suporta a inteligência artificial generativa **Gemini 3.6 Flash** para criar mensagens personalizadas e clinicamente adaptadas:
+O sistema integra a inteligência artificial generativa **Google Gemini Flash** para criar mensagens personalizadas e clinicamente adaptadas:
 
-- **Endpoint da API:**
-  ```text
-  https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent
-  ```
+- **Módulo de Configuração Central ([`app-config.js`](file:///home/maxwell/terminal/app-config.js)):**
+  - Gerencia a chave da API do Gemini (`AppConfig.getGeminiApiKey()` e `AppConfig.setGeminiApiKey()`).
+  - Suporta injeção de chave via variável de ambiente `GEMINI_API_KEY` durante o build no AWS Amplify.
 - **Fallback Automático:** Quando a chave não está configurada ou a IA está temporariamente indisponível, o motor local anti-spam assume a geração de forma instantânea e sem interrupção.
 - **Configuração da Chave:**
   - Abra o modal clicando em **⚙️ Configurações** ou digite `ia` / `apikey [chave]` no terminal.
