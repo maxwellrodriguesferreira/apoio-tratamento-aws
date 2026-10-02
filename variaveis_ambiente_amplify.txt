@@ -1,0 +1,55 @@
+# ==============================================================================
+# VARIÁVEIS DE AMBIENTE - AWS AMPLIFY HOSTING & GOOGLE GEMINI
+# Aplicação: Terminal de Apoio ao Tratamento & Serviços Farmacêuticos
+# Repositório: git@github.com:maxwellrodriguesferreira/apoio-tratamento-aws.git
+# ==============================================================================
+#
+# INSTRUÇÕES DE USO NO CONSOLE DA AWS AMPLIFY:
+# 1. Acesse o AWS Amplify Console (https://console.aws.amazon.com/amplify/)
+# 2. Selecione o seu aplicativo "apoio-tratamento-aws"
+# 3. No menu lateral esquerdo, clique em "App settings" > "Environment variables"
+# 4. Clique no botão "Manage variables" ou "Add variable"
+# 5. Adicione cada uma das chaves e valores listados abaixo.
+# 6. Salve e clique em "Redeploy this version" na aba de deploys.
+#
+# ==============================================================================
+
+# ------------------------------------------------------------------------------
+# 1. CHAVE DE API DO GOOGLE GEMINI (IA GENERATIVA)
+# ------------------------------------------------------------------------------
+# Obtenha sua chave gratuita em: https://aistudio.google.com/apikey
+GEMINI_API_KEY=AIzaSySuaChaveDoGeminiAqui
+
+# ------------------------------------------------------------------------------
+# 2. AUTENTICAÇÃO AWS COGNITO (OPCIONAL / RECOMENDADO PARA NUVEM)
+# ------------------------------------------------------------------------------
+# Região onde o seu User Pool foi criado (ex: us-east-1, sa-east-1)
+COGNITO_REGION=us-east-1
+
+# ID do User Pool criado no AWS Cognito (ex: us-east-1_AbC123XyZ)
+COGNITO_USER_POOL_ID=us-east-1_xxxxxxxxx
+
+# ID do App Client (Cliente Público sem segredo / sem client secret)
+COGNITO_CLIENT_ID=7abcdef1234567890abcdef
+
+# ------------------------------------------------------------------------------
+# 3. ADMINISTRADOR MESTRE DA APLICAÇÃO
+# ------------------------------------------------------------------------------
+# E-mail do Administrador principal responsável pela aprovação de farmacêuticos
+ADMIN_USER=maxwellferreira@proton.me
+
+# Senha de acesso do Administrador principal
+ADMIN_PASSWORD=admin123
+
+# ==============================================================================
+# TABELA RÁPIDA PARA COPIAR E COLAR
+# ==============================================================================
+# Chave (Key)               | Valor (Value)
+# ------------------------- | --------------------------------------------------
+# GEMINI_API_KEY            | AIzaSySuaChaveDoGeminiAqui
+# COGNITO_REGION            | us-east-1
+# COGNITO_USER_POOL_ID      | us-east-1_xxxxxxxxx
+# COGNITO_CLIENT_ID         | 7abcdef1234567890abcdef
+# ADMIN_USER                | maxwellferreira@proton.me
+# ADMIN_PASSWORD            | admin123
+# ==============================================================================
