@@ -42,7 +42,7 @@ const UserDB = (function() {
   // Gera hash seguro de senha utilizando PBKDF2 (SHA-256)
   async function hashPassword(password, saltHex = null) {
     if (!password) throw new Error('Senha não pode ser vazia.');
-    const encoder = new TextEncoder();
+    const encoder = typeof TextEncoder !== 'undefined' ? new TextEncoder() : { encode: (s) => new Uint8Array(Buffer.from ? Buffer.from(s, 'utf8') : s.split('').map(c => c.charCodeAt(0))) };
     const passBuffer = encoder.encode(password);
 
     let saltBuffer;
@@ -155,16 +155,12 @@ const UserDB = (function() {
   // Inicializa o banco com o Administrador padrão caso esteja vazio
   async function initializeDatabase() {
     let users = loadUsersFromStorage();
-    const adminExists = users.some(u => 
-      SUPER_ADMINS.includes(String(u.email || '').toLowerCase()) || 
-      String(u.email || '').toLowerCase() === 'admin@sistema.local' ||
-      u.role === 'admin'
-    );
+    const nowIso = new Date().toISOString();
+    const defaultAdminPass = await hashPassword('admin123');
 
-    if (!adminExists) {
-      const defaultAdminPass = await hashPassword('admin123');
-      const nowIso = new Date().toISOString();
-      const defaultAdmin = {
+    // Garante existência de admin@sistema.local
+    if (!users.some(u => (u.email && u.email.toLowerCase() === 'admin@sistema.local') || u.uid === 'admin-master-001')) {
+      users.unshift({
         uid: 'admin-master-001',
         name: 'Administrador Master',
         email: 'admin@sistema.local',
@@ -188,10 +184,39 @@ const UserDB = (function() {
           timestamp: nowIso,
           details: 'Conta mestre de administrador inicializada'
         }]
-      };
-      users.unshift(defaultAdmin);
-      persistUsersToStorage(users);
+      });
     }
+
+    // Garante existência de maxwellferreira@proton.me
+    if (!users.some(u => u.email && u.email.toLowerCase() === 'maxwellferreira@proton.me')) {
+      users.push({
+        uid: 'admin-maxwell-001',
+        name: 'Maxwell Rodrigues Ferreira',
+        email: 'maxwellferreira@proton.me',
+        drogaria: 'Drogasil Mogilar',
+        passwordHash: defaultAdminPass.hash,
+        passwordSalt: defaultAdminPass.salt,
+        role: 'admin',
+        status: 'approved',
+        createdAt: nowIso,
+        updatedAt: nowIso,
+        approvedAt: nowIso,
+        approvedBy: 'system',
+        rejectedAt: null,
+        rejectedBy: null,
+        blockedAt: null,
+        blockedBy: null,
+        rejectionReason: null,
+        auditLog: [{
+          action: 'BOOTSTRAP',
+          performedBy: 'system',
+          timestamp: nowIso,
+          details: 'Conta de Administrador / Farmacêutico Responsável inicializada'
+        }]
+      });
+    }
+
+    persistUsersToStorage(users);
     return users;
   }
 
@@ -289,26 +314,23 @@ const UserDB = (function() {
 
       const users = loadUsersFromStorage();
       
-      // Suporte a login mestre admin / admin123
-      if (term === 'admin' || term === 'admin@sistema.local') {
-        const adminRecord = users.find(u => u.email === 'admin@sistema.local' || u.uid === 'admin-master-001' || u.role === 'admin');
-        if (adminRecord && adminRecord.passwordHash && adminRecord.passwordSalt) {
-          const valid = await verifyPassword(cleanPass, adminRecord.passwordHash, adminRecord.passwordSalt);
-          if (!valid && cleanPass === 'admin123') {
-            // Atualiza hash caso tenha mudado
-            const rehash = await hashPassword('admin123');
-            adminRecord.passwordHash = rehash.hash;
-            adminRecord.passwordSalt = rehash.salt;
-            persistUsersToStorage(users);
-            return { user: adminRecord, status: 'approved' };
-          }
-          if (!valid) throw new Error('E-mail ou senha incorretos.');
+      // Suporte a login mestre admin / maxwellferreira@proton.me / admin@sistema.local
+      const isSuperTerm = SUPER_ADMINS.includes(term) || term === 'admin';
+      if (isSuperTerm) {
+        const adminRecord = users.find(u => 
+          (u.email && u.email.toLowerCase() === term) ||
+          (term === 'admin' && (u.email === 'admin@sistema.local' || u.uid === 'admin-master-001' || u.role === 'admin'))
+        ) || {
+          uid: 'admin-master-001',
+          name: term.includes('maxwell') ? 'Maxwell Rodrigues Ferreira' : 'Administrador Master',
+          email: term.includes('@') ? term : 'admin@sistema.local',
+          drogaria: 'Drogasil Mogilar',
+          role: 'admin',
+          status: 'approved'
+        };
+
+        if (cleanPass === 'admin123' || (adminRecord.passwordHash && await verifyPassword(cleanPass, adminRecord.passwordHash, adminRecord.passwordSalt))) {
           return { user: adminRecord, status: 'approved' };
-        } else if (cleanPass === 'admin123') {
-          return {
-            user: { uid: 'admin-master-001', name: 'Administrador Master', email: 'admin@sistema.local', role: 'admin', status: 'approved' },
-            status: 'approved'
-          };
         }
       }
 
@@ -521,9 +543,11 @@ const UserDB = (function() {
 // Exportação global
 if (typeof window !== 'undefined') {
   window.UserDB = UserDB;
-  document.addEventListener('DOMContentLoaded', () => {
-    if (window.UserDB && typeof window.UserDB.initialize === 'function') {
-      window.UserDB.initialize();
-    }
-  });
+  if (typeof document !== 'undefined') {
+    document.addEventListener('DOMContentLoaded', () => {
+      if (window.UserDB && typeof window.UserDB.initialize === 'function') {
+        window.UserDB.initialize();
+      }
+    });
+  }
 }

@@ -162,26 +162,30 @@ const CognitoAuth = (function() {
           return reject(new Error('Preencha o e-mail/usuário e a senha.'));
         }
 
-        // Suporte a Administrador Mestre local (admin / admin123 ou lista mestre)
-        if (rawUser === 'admin' || rawUser === 'admin@sistema.local') {
-          const cfg = typeof window !== 'undefined' && window.AppConfig && typeof window.AppConfig.getAdminCredentials === 'function'
-            ? window.AppConfig.getAdminCredentials()
-            : { user: 'admin', pass: 'admin123', name: 'Administrador Master' };
+        // Suporte a Administrador Mestre local (admin / maxwellferreira@proton.me / admin@sistema.local)
+        const cfg = typeof window !== 'undefined' && window.AppConfig && typeof window.AppConfig.getAdminCredentials === 'function'
+          ? window.AppConfig.getAdminCredentials()
+          : { user: 'admin', pass: 'admin123', name: 'Administrador Master' };
 
-          if (rawPass === cfg.pass || rawPass === 'admin123') {
-            return resolve({
-              user: {
-                uid: 'admin-master-001',
-                email: 'admin@sistema.local',
-                name: cfg.name || 'Administrador Master',
-                drogaria: 'Drogasil Mogilar',
-                role: 'admin',
-                status: 'approved',
-                provider: 'local-admin'
-              },
-              status: 'approved'
-            });
-          }
+        const isSuperMaster = SUPER_ADMINS.includes(rawUser) || 
+                              rawUser === 'admin' || 
+                              rawUser === String(cfg.user || '').toLowerCase();
+
+        if (isSuperMaster && (rawPass === cfg.pass || rawPass === 'admin123')) {
+          const adminEmail = rawUser.includes('@') ? rawUser : 'admin@sistema.local';
+          const adminName = rawUser.includes('maxwell') ? 'Maxwell Rodrigues Ferreira' : (cfg.name || 'Administrador Master');
+          return resolve({
+            user: {
+              uid: 'admin-master-001',
+              email: adminEmail,
+              name: adminName,
+              drogaria: 'Drogasil Mogilar',
+              role: 'admin',
+              status: 'approved',
+              provider: 'local-admin'
+            },
+            status: 'approved'
+          });
         }
 
         const userPool = getCognitoPool();
