@@ -59,8 +59,7 @@ if (typeof window !== 'undefined' && typeof localStorage !== 'undefined') {
 
 const SUPER_ADMIN_EMAILS = [
   'maxwellferreira@proton.me',
-  'maxwell',
-  'admin@sistema.local'
+  'maxwell'
 ];
 
 const DEFAULT_AUTH = {
@@ -606,7 +605,7 @@ async function handleLoginSubmit(e) {
       // Fallback local caso módulos externos não instanciados
       if (rawUser.toLowerCase() === DEFAULT_AUTH.user && rawPass === DEFAULT_AUTH.pass) {
         authResult = {
-          user: { uid: 'admin-master-001', name: DEFAULT_AUTH.name, email: 'admin@sistema.local', role: 'admin', status: 'approved' },
+          user: { uid: 'admin-maxwell-001', name: 'Maxwell Rodrigues Ferreira', email: 'maxwellferreira@proton.me', role: 'admin', status: 'approved' },
           status: 'approved'
         };
       } else {

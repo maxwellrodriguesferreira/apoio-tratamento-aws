@@ -11,7 +11,6 @@
 const CognitoAuth = (function() {
   const SUPER_ADMINS = [
     'maxwellferreira@proton.me',
-    'admin@sistema.local',
     'admin'
   ];
 
@@ -162,7 +161,7 @@ const CognitoAuth = (function() {
           return reject(new Error('Preencha o e-mail/usuário e a senha.'));
         }
 
-        // Suporte a Administrador Mestre local (admin / maxwellferreira@proton.me / admin@sistema.local)
+        // Suporte a Administrador Mestre local (admin / maxwellferreira@proton.me)
         const cfg = typeof window !== 'undefined' && window.AppConfig && typeof window.AppConfig.getAdminCredentials === 'function'
           ? window.AppConfig.getAdminCredentials()
           : { user: 'admin', pass: 'admin123', name: 'Administrador Master' };
@@ -172,11 +171,11 @@ const CognitoAuth = (function() {
                               rawUser === String(cfg.user || '').toLowerCase();
 
         if (isSuperMaster && (rawPass === cfg.pass || rawPass === 'admin123')) {
-          const adminEmail = rawUser.includes('@') ? rawUser : 'admin@sistema.local';
-          const adminName = rawUser.includes('maxwell') ? 'Maxwell Rodrigues Ferreira' : (cfg.name || 'Administrador Master');
+          const adminEmail = rawUser.includes('@') ? rawUser : (cfg.user?.includes('@') ? cfg.user : 'maxwellferreira@proton.me');
+          const adminName = rawUser.includes('maxwell') ? 'Maxwell Rodrigues Ferreira' : (cfg.name || 'Maxwell Rodrigues Ferreira');
           return resolve({
             user: {
-              uid: 'admin-master-001',
+              uid: 'admin-maxwell-001',
               email: adminEmail,
               name: adminName,
               drogaria: 'Drogasil Mogilar',

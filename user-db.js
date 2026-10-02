@@ -16,7 +16,6 @@ const UserDB = (function() {
 
   const SUPER_ADMINS = [
     'maxwellferreira@proton.me',
-    'admin@sistema.local',
     'admin'
   ];
 
@@ -158,38 +157,12 @@ const UserDB = (function() {
     const nowIso = new Date().toISOString();
     const defaultAdminPass = await hashPassword('admin123');
 
-    // Garante existência de admin@sistema.local
-    if (!users.some(u => (u.email && u.email.toLowerCase() === 'admin@sistema.local') || u.uid === 'admin-master-001')) {
-      users.unshift({
-        uid: 'admin-master-001',
-        name: 'Administrador Master',
-        email: 'admin@sistema.local',
-        drogaria: 'Drogasil Mogilar',
-        passwordHash: defaultAdminPass.hash,
-        passwordSalt: defaultAdminPass.salt,
-        role: 'admin',
-        status: 'approved',
-        createdAt: nowIso,
-        updatedAt: nowIso,
-        approvedAt: nowIso,
-        approvedBy: 'system',
-        rejectedAt: null,
-        rejectedBy: null,
-        blockedAt: null,
-        blockedBy: null,
-        rejectionReason: null,
-        auditLog: [{
-          action: 'BOOTSTRAP',
-          performedBy: 'system',
-          timestamp: nowIso,
-          details: 'Conta mestre de administrador inicializada'
-        }]
-      });
-    }
+    // Remove qualquer registro legado de admin@sistema.local
+    users = users.filter(u => u.email && u.email.toLowerCase() !== 'admin@sistema.local');
 
-    // Garante existência de maxwellferreira@proton.me
+    // Garante existência de maxwellferreira@proton.me como Administrador Mestre
     if (!users.some(u => u.email && u.email.toLowerCase() === 'maxwellferreira@proton.me')) {
-      users.push({
+      users.unshift({
         uid: 'admin-maxwell-001',
         name: 'Maxwell Rodrigues Ferreira',
         email: 'maxwellferreira@proton.me',
@@ -314,16 +287,16 @@ const UserDB = (function() {
 
       const users = loadUsersFromStorage();
       
-      // Suporte a login mestre admin / maxwellferreira@proton.me / admin@sistema.local
+      // Suporte a login mestre admin / maxwellferreira@proton.me
       const isSuperTerm = SUPER_ADMINS.includes(term) || term === 'admin';
       if (isSuperTerm) {
         const adminRecord = users.find(u => 
           (u.email && u.email.toLowerCase() === term) ||
-          (term === 'admin' && (u.email === 'admin@sistema.local' || u.uid === 'admin-master-001' || u.role === 'admin'))
+          (term === 'admin' && (u.email === 'maxwellferreira@proton.me' || u.uid === 'admin-maxwell-001' || u.role === 'admin'))
         ) || {
-          uid: 'admin-master-001',
-          name: term.includes('maxwell') ? 'Maxwell Rodrigues Ferreira' : 'Administrador Master',
-          email: term.includes('@') ? term : 'admin@sistema.local',
+          uid: 'admin-maxwell-001',
+          name: 'Maxwell Rodrigues Ferreira',
+          email: 'maxwellferreira@proton.me',
           drogaria: 'Drogasil Mogilar',
           role: 'admin',
           status: 'approved'

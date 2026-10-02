@@ -191,7 +191,7 @@ const testContext = {
     querySelectorAll() { return []; }
   },
   DEFAULT_CONFIG: { drogaria: 'Drogasil Mogilar', farmaceutico: 'Maxwell' },
-  SUPER_ADMIN_EMAILS: ['maxwellferreira@proton.me', 'maxwell', 'admin@sistema.local'],
+  SUPER_ADMIN_EMAILS: ['maxwellferreira@proton.me', 'maxwell'],
   USERS_STORAGE_KEY: 'apoio_users_registry'
 };
 
