@@ -1,3 +1,8 @@
 .firebase/
+.amplify/
+amplify/#current-cloud-backend
+amplify/.config/local-*
+amplify/backend/awscloudformation
 node_modules/
 *.log
+
