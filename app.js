@@ -58,14 +58,13 @@ if (typeof window !== 'undefined' && typeof localStorage !== 'undefined') {
 }
 
 const SUPER_ADMIN_EMAILS = [
-  'maxwellferreira@proton.me',
-  'maxwell'
+  'maxwellferreira@proton.me'
 ];
 
 const DEFAULT_AUTH = {
-  user: 'admin',
-  pass: 'admin123',
-  name: 'Administrador'
+  user: 'maxwellferreira@proton.me',
+  pass: '',
+  name: 'Maxwell Rodrigues Ferreira'
 };
 
 const USERS_STORAGE_KEY = 'apoio_users_registry';
@@ -2066,8 +2065,21 @@ function removeGeminiApiKey() {
   saveGeminiApiKey('');
 }
 
-const GEMINI_MODEL = (typeof window !== 'undefined' && window.AppConfig && typeof window.AppConfig.getGeminiModel === 'function') ? window.AppConfig.getGeminiModel() : 'gemini-2.5-flash';
-const GEMINI_MODEL_LABEL = 'Google Gemini 3.6 Flash';
+const GEMINI_CANDIDATE_MODELS = [
+  'gemini-3.8-flash',
+  'gemini-2.0-flash',
+  'gemini-1.5-flash',
+  'gemini-2.5-flash',
+  'gemini-1.5-pro'
+];
+
+let activeGeminiModel = (typeof window !== 'undefined' && window.AppConfig && typeof window.AppConfig.getGeminiModel === 'function') 
+  ? window.AppConfig.getGeminiModel() 
+  : 'gemini-3.8-flash';
+
+const GEMINI_MODEL = activeGeminiModel;
+const GEMINI_MODEL_LABEL = 'Google Gemini Flash';
+
 const GEMINI_RESPONSE_SCHEMA = {
   type: 'OBJECT',
   properties: {
@@ -2078,6 +2090,7 @@ const GEMINI_RESPONSE_SCHEMA = {
   },
   required: ['empatico', 'atencioso', 'descontraido', 'pos_tratamento']
 };
+
 const GEMINI_BATCH_RESPONSE_SCHEMA = {
   type: 'ARRAY',
   items: {
@@ -2090,6 +2103,7 @@ const GEMINI_BATCH_RESPONSE_SCHEMA = {
     required: ['index', 'nome', 'mensagem']
   }
 };
+
 const GEMINI_FAILURE_RESET_MS = 10 * 60 * 1000;
 const GEMINI_FAILURE_THRESHOLD = 3;
 
@@ -2151,8 +2165,9 @@ function resetGeminiFailureState() {
   setGeminiFailureState({ count: 0, lastFailureAt: 0, blockedUntil: 0 });
 }
 
-function getGeminiEndpoint(apiKey) {
-  return `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${encodeURIComponent(apiKey)}`;
+function getGeminiEndpoint(apiKey, modelName = null) {
+  const model = modelName || activeGeminiModel || 'gemini-3.8-flash';
+  return `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent?key=${encodeURIComponent(apiKey)}`;
 }
 
 async function callGeminiAPI(promptText, customSchema = null) {
@@ -2161,7 +2176,6 @@ async function callGeminiAPI(promptText, customSchema = null) {
     throw new Error("Chave de API do Gemini não configurada. Digite 'apikey SUACHAVE' no terminal ou configure no painel.");
   }
 
-  const endpoint = getGeminiEndpoint(apiKey);
   const schemaToUse = customSchema !== null && customSchema !== undefined ? customSchema : GEMINI_RESPONSE_SCHEMA;
 
   const generationConfig = {
@@ -2174,28 +2188,54 @@ async function callGeminiAPI(promptText, customSchema = null) {
     generationConfig.responseSchema = schemaToUse;
   }
 
-  const response = await fetch(endpoint, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      contents: [{
-        parts: [{ text: promptText }]
-      }],
-      generationConfig: generationConfig
-    })
+  const requestBody = JSON.stringify({
+    contents: [{
+      parts: [{ text: promptText }]
+    }],
+    generationConfig: generationConfig
   });
 
-  if (!response.ok) {
-    const errorData = await response.json().catch(() => ({}));
-    const msg = errorData.error?.message || response.statusText;
-    throw new Error(`Erro na API Gemini (${response.status}): ${msg}`);
+  // Tenta primeiro o modelo ativo, depois os demais candidatos caso retorne 404 (modelo descontinuado)
+  const modelsToTry = [activeGeminiModel, ...GEMINI_CANDIDATE_MODELS.filter(m => m !== activeGeminiModel)];
+  let lastError = null;
+
+  for (const modelCandidate of modelsToTry) {
+    try {
+      const endpoint = getGeminiEndpoint(apiKey, modelCandidate);
+      const response = await fetch(endpoint, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: requestBody
+      });
+
+      if (response.status === 404) {
+        // Modelo não disponível para este usuário/região, tenta o próximo candidato
+        continue;
+      }
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        const msg = errorData.error?.message || response.statusText;
+        throw new Error(`Erro na API Gemini (${response.status}): ${msg}`);
+      }
+
+      const data = await response.json();
+      if (data.candidates && data.candidates[0] && data.candidates[0].content && data.candidates[0].content.parts && data.candidates[0].content.parts[0]) {
+        // Salva modelo que funcionou para próximas chamadas
+        activeGeminiModel = modelCandidate;
+        return data.candidates[0].content.parts[0].text;
+      }
+      throw new Error("Resposta inválida recebida da API Gemini.");
+    } catch (err) {
+      lastError = err;
+      if (err.message && err.message.includes('404')) {
+        continue;
+      }
+      throw err;
+    }
   }
 
-  const data = await response.json();
-  if (data.candidates && data.candidates[0] && data.candidates[0].content && data.candidates[0].content.parts && data.candidates[0].content.parts[0]) {
-    return data.candidates[0].content.parts[0].text;
-  }
-  throw new Error("Resposta inválida recebida da API Gemini.");
+  throw lastError || new Error("Nenhum modelo Gemini compatível respondeu com sucesso.");
 }
 
 function sanitizeGeminiJsonResponse(rawText) {

@@ -1,4 +1,15 @@
-# Amplify Gen 2 & Cloud Formation
+# Arquivos de Variáveis e Credenciais Sensíveis
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.cert
+variaveis_ambiente_amplify.txt
+credentials.json
+secrets.*
+
+# Amplify & CloudFormation
 .amplify/
 amplifyconfiguration*.json
 amplify_outputs*.json
@@ -16,4 +27,3 @@ dist/
 *.log
 .DS_Store
 Thumbs.db
-.env

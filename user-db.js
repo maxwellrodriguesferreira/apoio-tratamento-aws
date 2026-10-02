@@ -15,8 +15,7 @@ const UserDB = (function() {
   const PBKDF2_ITERATIONS = 100000;
 
   const SUPER_ADMINS = [
-    'maxwellferreira@proton.me',
-    'admin'
+    'maxwellferreira@proton.me'
   ];
 
   // Converte ArrayBuffer para string Hexadecimal
@@ -155,20 +154,26 @@ const UserDB = (function() {
   async function initializeDatabase() {
     let users = loadUsersFromStorage();
     const nowIso = new Date().toISOString();
-    const defaultAdminPass = await hashPassword('admin123');
 
     // Remove qualquer registro legado de admin@sistema.local
     users = users.filter(u => u.email && u.email.toLowerCase() !== 'admin@sistema.local');
 
+    // Obtém configuração de senha de administrador caso injetada via AWS Amplify
+    const cfg = typeof window !== 'undefined' && window.AppConfig && typeof window.AppConfig.getAdminCredentials === 'function'
+      ? window.AppConfig.getAdminCredentials()
+      : null;
+    const adminPassHash = (cfg && cfg.pass) ? await hashPassword(cfg.pass) : null;
+
     // Garante existência de maxwellferreira@proton.me como Administrador Mestre
-    if (!users.some(u => u.email && u.email.toLowerCase() === 'maxwellferreira@proton.me')) {
+    const existingAdmin = users.find(u => u.email && u.email.toLowerCase() === 'maxwellferreira@proton.me');
+    if (!existingAdmin) {
       users.unshift({
         uid: 'admin-maxwell-001',
         name: 'Maxwell Rodrigues Ferreira',
         email: 'maxwellferreira@proton.me',
         drogaria: 'Drogasil Mogilar',
-        passwordHash: defaultAdminPass.hash,
-        passwordSalt: defaultAdminPass.salt,
+        passwordHash: adminPassHash ? adminPassHash.hash : null,
+        passwordSalt: adminPassHash ? adminPassHash.salt : null,
         role: 'admin',
         status: 'approved',
         createdAt: nowIso,
@@ -287,40 +292,73 @@ const UserDB = (function() {
 
       const users = loadUsersFromStorage();
       
-      // Suporte a login mestre admin / maxwellferreira@proton.me
-      const isSuperTerm = SUPER_ADMINS.includes(term) || term === 'admin';
-      if (isSuperTerm) {
-        const adminRecord = users.find(u => 
-          (u.email && u.email.toLowerCase() === term) ||
-          (term === 'admin' && (u.email === 'maxwellferreira@proton.me' || u.uid === 'admin-maxwell-001' || u.role === 'admin'))
-        ) || {
-          uid: 'admin-maxwell-001',
-          name: 'Maxwell Rodrigues Ferreira',
-          email: 'maxwellferreira@proton.me',
-          drogaria: 'Drogasil Mogilar',
-          role: 'admin',
-          status: 'approved'
-        };
-
-        if (cleanPass === 'admin123' || (adminRecord.passwordHash && await verifyPassword(cleanPass, adminRecord.passwordHash, adminRecord.passwordSalt))) {
-          return { user: adminRecord, status: 'approved' };
-        }
-      }
-
+      // Busca o usuário pelo e-mail ou UID
       const user = users.find(u => 
         (u.email && u.email.toLowerCase() === term) ||
         (u.uid && u.uid.toLowerCase() === term)
       );
 
       if (!user) {
-        throw new Error('Usuário não encontrado.');
+        // Se for o super admin e ainda não existir no registro, cria o registro
+        if (SUPER_ADMINS.includes(term)) {
+          const cfg = typeof window !== 'undefined' && window.AppConfig && typeof window.AppConfig.getAdminCredentials === 'function'
+            ? window.AppConfig.getAdminCredentials()
+            : null;
+          if (cfg && cfg.pass && cleanPass === cfg.pass) {
+            const nowIso = new Date().toISOString();
+            const hashed = await hashPassword(cleanPass);
+            const adminUser = {
+              uid: 'admin-maxwell-001',
+              name: 'Maxwell Rodrigues Ferreira',
+              email: 'maxwellferreira@proton.me',
+              drogaria: 'Drogasil Mogilar',
+              passwordHash: hashed.hash,
+              passwordSalt: hashed.salt,
+              role: 'admin',
+              status: 'approved',
+              createdAt: nowIso,
+              updatedAt: nowIso,
+              approvedAt: nowIso,
+              approvedBy: 'system',
+              auditLog: []
+            };
+            users.push(adminUser);
+            persistUsersToStorage(users);
+            return { user: adminUser, status: 'approved' };
+          }
+        }
+        throw new Error('Usuário não encontrado. Verifique seu e-mail ou solicite cadastro.');
       }
 
-      // Valida senha se existir hash
+      // Validação de senha via hash criptográfico PBKDF2 / SHA-256
       if (user.passwordHash && user.passwordSalt) {
         const isValid = await verifyPassword(cleanPass, user.passwordHash, user.passwordSalt);
         if (!isValid) {
-          throw new Error('E-mail ou senha incorretos.');
+          // Permite login se a senha de ambiente da AWS Amplify foi injetada e corresponde
+          const cfg = typeof window !== 'undefined' && window.AppConfig && typeof window.AppConfig.getAdminCredentials === 'function'
+            ? window.AppConfig.getAdminCredentials()
+            : null;
+          if (SUPER_ADMINS.includes(user.email.toLowerCase()) && cfg && cfg.pass && cleanPass === cfg.pass) {
+            const rehashed = await hashPassword(cleanPass);
+            user.passwordHash = rehashed.hash;
+            user.passwordSalt = rehashed.salt;
+            persistUsersToStorage(users);
+          } else {
+            throw new Error('E-mail ou senha incorretos.');
+          }
+        }
+      } else {
+        // Usuário sem hash de senha configurado
+        const cfg = typeof window !== 'undefined' && window.AppConfig && typeof window.AppConfig.getAdminCredentials === 'function'
+          ? window.AppConfig.getAdminCredentials()
+          : null;
+        if (SUPER_ADMINS.includes(user.email.toLowerCase()) && cfg && cfg.pass && cleanPass === cfg.pass) {
+          const hashed = await hashPassword(cleanPass);
+          user.passwordHash = hashed.hash;
+          user.passwordSalt = hashed.salt;
+          persistUsersToStorage(users);
+        } else {
+          throw new Error('Senha não configurada. Utilize a opção "Esqueci a senha" para definir sua senha.');
         }
       }
 

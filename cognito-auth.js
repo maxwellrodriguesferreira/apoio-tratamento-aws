@@ -10,8 +10,7 @@
 
 const CognitoAuth = (function() {
   const SUPER_ADMINS = [
-    'maxwellferreira@proton.me',
-    'admin'
+    'maxwellferreira@proton.me'
   ];
 
   function getCognitoPool() {
@@ -161,18 +160,17 @@ const CognitoAuth = (function() {
           return reject(new Error('Preencha o e-mail/usuário e a senha.'));
         }
 
-        // Suporte a Administrador Mestre local (admin / maxwellferreira@proton.me)
+        // Suporte a Administrador Mestre exclusivo (maxwellferreira@proton.me)
         const cfg = typeof window !== 'undefined' && window.AppConfig && typeof window.AppConfig.getAdminCredentials === 'function'
           ? window.AppConfig.getAdminCredentials()
-          : { user: 'admin', pass: 'admin123', name: 'Administrador Master' };
+          : { user: 'maxwellferreira@proton.me', pass: '', name: 'Maxwell Rodrigues Ferreira' };
 
-        const isSuperMaster = SUPER_ADMINS.includes(rawUser) || 
-                              rawUser === 'admin' || 
-                              rawUser === String(cfg.user || '').toLowerCase();
+        const isSuperMaster = SUPER_ADMINS.includes(rawUser) || rawUser === String(cfg.user || '').toLowerCase();
 
-        if (isSuperMaster && (rawPass === cfg.pass || rawPass === 'admin123')) {
-          const adminEmail = rawUser.includes('@') ? rawUser : (cfg.user?.includes('@') ? cfg.user : 'maxwellferreira@proton.me');
-          const adminName = rawUser.includes('maxwell') ? 'Maxwell Rodrigues Ferreira' : (cfg.name || 'Maxwell Rodrigues Ferreira');
+        // Se uma senha de build foi injetada no AWS Amplify e confere com a digitada
+        if (isSuperMaster && cfg.pass && rawPass === cfg.pass) {
+          const adminEmail = 'maxwellferreira@proton.me';
+          const adminName = 'Maxwell Rodrigues Ferreira';
           return resolve({
             user: {
               uid: 'admin-maxwell-001',
@@ -181,7 +179,7 @@ const CognitoAuth = (function() {
               drogaria: 'Drogasil Mogilar',
               role: 'admin',
               status: 'approved',
-              provider: 'local-admin'
+              provider: 'aws-admin'
             },
             status: 'approved'
           });

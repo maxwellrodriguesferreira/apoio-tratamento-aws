@@ -13,7 +13,7 @@ const APP_CONFIG = {
   geminiApiKey: "GEMINI_API_KEY_PLACEHOLDER",
   
   // Modelo padrão do Google Gemini
-  geminiModel: "gemini-2.5-flash",
+  geminiModel: "gemini-3.8-flash",
   
   // Configurações do AWS Cognito User Pools (Injetadas via AWS Amplify Environment Variables)
   cognitoRegion: "COGNITO_REGION_PLACEHOLDER",
@@ -149,16 +149,16 @@ const AppConfig = {
   },
 
   /**
-   * Obtém as credenciais padrão do Administrador Master configuradas
+   * Obtém as credenciais do Administrador Master configuradas via AWS Amplify
    */
   getAdminCredentials: function() {
     const user = (APP_CONFIG.adminUser && !APP_CONFIG.adminUser.includes('PLACEHOLDER')) 
       ? APP_CONFIG.adminUser.trim() 
-      : 'admin';
+      : 'maxwellferreira@proton.me';
     const pass = (APP_CONFIG.adminPassword && !APP_CONFIG.adminPassword.includes('PLACEHOLDER')) 
       ? APP_CONFIG.adminPassword.trim() 
-      : 'admin123';
-    const name = APP_CONFIG.adminName || 'Administrador Master';
+      : '';
+    const name = APP_CONFIG.adminName || 'Maxwell Rodrigues Ferreira';
     return { user, pass, name };
   },
 
@@ -166,7 +166,7 @@ const AppConfig = {
    * Obtém o modelo Gemini em uso
    */
   getGeminiModel: function() {
-    return APP_CONFIG.geminiModel || 'gemini-2.5-flash';
+    return APP_CONFIG.geminiModel || 'gemini-3.8-flash';
   }
 };
 
