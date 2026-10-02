@@ -1869,8 +1869,7 @@ function generateMessages(params) {
 
 function getGeminiApiKey() {
   if (typeof window !== 'undefined' && window.AppConfig && typeof window.AppConfig.getGeminiApiKey === 'function') {
-    const key = window.AppConfig.getGeminiApiKey();
-    if (key) return key;
+    return window.AppConfig.getGeminiApiKey();
   }
   return (typeof localStorage !== 'undefined' ? localStorage.getItem('apoio_gemini_api_key') : '') || '';
 }
@@ -1878,7 +1877,8 @@ function getGeminiApiKey() {
 function saveGeminiApiKey(key) {
   if (typeof window !== 'undefined' && window.AppConfig && typeof window.AppConfig.setGeminiApiKey === 'function') {
     window.AppConfig.setGeminiApiKey(key);
-  } else if (typeof localStorage !== 'undefined') {
+  }
+  if (typeof localStorage !== 'undefined') {
     if (key) localStorage.setItem('apoio_gemini_api_key', key);
     else localStorage.removeItem('apoio_gemini_api_key');
   }

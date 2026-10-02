@@ -34,37 +34,89 @@ const APP_CONFIG = {
 // Armazenamento da configuração da aplicação
 const AppConfig = {
   /**
-   * Obtém a chave da API do Gemini configurada (priorizando App Config, depois Local Storage)
+   * Obtém a chave da API do Gemini configurada com persistência multicamada permanente
    */
   getGeminiApiKey: function() {
-    // 1. Chave injetada no build ou configurada no APP_CONFIG (se não for placeholder)
+    // 1. Chave injetada no build do AWS Amplify ou gravada no APP_CONFIG
     if (APP_CONFIG.geminiApiKey && APP_CONFIG.geminiApiKey !== 'GEMINI_API_KEY_PLACEHOLDER' && !APP_CONFIG.geminiApiKey.includes('PLACEHOLDER')) {
       return APP_CONFIG.geminiApiKey.trim();
     }
     
-    // 2. Chave armazenada na configuração local do app
+    // 2. Chave armazenada no LocalStorage do navegador
     if (typeof localStorage !== 'undefined') {
-      const savedKey = localStorage.getItem('apoio_gemini_api_key');
-      if (savedKey && savedKey.trim()) {
-        return savedKey.trim();
-      }
+      try {
+        const savedKey = localStorage.getItem('apoio_gemini_api_key');
+        if (savedKey && savedKey.trim()) {
+          return savedKey.trim();
+        }
+      } catch (e) {}
+    }
+
+    // 3. Fallback: SessionStorage
+    if (typeof sessionStorage !== 'undefined') {
+      try {
+        const sessionKey = sessionStorage.getItem('apoio_gemini_api_key');
+        if (sessionKey && sessionKey.trim()) {
+          return sessionKey.trim();
+        }
+      } catch (e) {}
+    }
+
+    // 4. Fallback: Cookie permanente (10 anos)
+    if (typeof document !== 'undefined' && document.cookie) {
+      try {
+        const match = document.cookie.match(/(?:^|; )apoio_gemini_api_key=([^;]*)/);
+        if (match && match[1]) {
+          const decoded = decodeURIComponent(match[1]).trim();
+          if (decoded) return decoded;
+        }
+      } catch (e) {}
     }
     
     return '';
   },
 
   /**
-   * Salva a chave da API do Gemini na configuração da aplicação
+   * Salva a chave da API do Gemini de forma permanente em todos os armazenamentos
    */
   setGeminiApiKey: function(apiKey) {
     const cleanKey = String(apiKey || '').trim();
+    
+    // 1. Grava no LocalStorage permanente
     if (typeof localStorage !== 'undefined') {
-      if (cleanKey) {
-        localStorage.setItem('apoio_gemini_api_key', cleanKey);
-      } else {
-        localStorage.removeItem('apoio_gemini_api_key');
-      }
+      try {
+        if (cleanKey) {
+          localStorage.setItem('apoio_gemini_api_key', cleanKey);
+        } else {
+          localStorage.removeItem('apoio_gemini_api_key');
+        }
+      } catch (e) {}
     }
+
+    // 2. Grava no SessionStorage
+    if (typeof sessionStorage !== 'undefined') {
+      try {
+        if (cleanKey) {
+          sessionStorage.setItem('apoio_gemini_api_key', cleanKey);
+        } else {
+          sessionStorage.removeItem('apoio_gemini_api_key');
+        }
+      } catch (e) {}
+    }
+
+    // 3. Grava em Cookie permanente com validade de 10 anos
+    if (typeof document !== 'undefined') {
+      try {
+        if (cleanKey) {
+          const maxAge = 10 * 365 * 24 * 60 * 60; // 10 anos
+          document.cookie = `apoio_gemini_api_key=${encodeURIComponent(cleanKey)}; max-age=${maxAge}; path=/; SameSite=Lax`;
+        } else {
+          document.cookie = 'apoio_gemini_api_key=; max-age=0; path=/; SameSite=Lax';
+        }
+      } catch (e) {}
+    }
+
+    // 4. Mantém em memória de execução
     APP_CONFIG.geminiApiKey = cleanKey || 'GEMINI_API_KEY_PLACEHOLDER';
     return true;
   },

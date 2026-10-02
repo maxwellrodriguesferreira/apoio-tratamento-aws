@@ -1,7 +1,19 @@
+# Amplify Gen 2 & Cloud Formation
 .amplify/
+amplifyconfiguration*.json
+amplify_outputs*.json
 amplify/#current-cloud-backend
 amplify/.config/local-*
 amplify/backend/awscloudformation
-node_modules/
-*.log
 
+# Dependências e Cache
+node_modules/
+.npm/
+dist/
+.cache/
+
+# Logs e Arquivos de Sistema
+*.log
+.DS_Store
+Thumbs.db
+.env
