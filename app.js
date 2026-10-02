@@ -451,17 +451,18 @@ async function handleForgotPasswordSubmit(e) {
     }
 
     pendingResetEmail = email;
-    showForgotFeedback(`✅ ${result.message || 'Código de verificação gerado com sucesso!'}`, 'is-success');
-    appendLog(`🔑 <strong>Recuperação de Senha:</strong> Código de verificação gerado para <strong>${escapeHTML(email)}</strong>.`, 'log-info');
+    showForgotFeedback('✅ Solicitação enviada! Verifique seu e-mail cadastrado.', 'is-success');
+    appendLog(`🔑 <strong>Recuperação de Senha:</strong> Solicitação de código de verificação para <strong>${escapeHTML(email)}</strong>.`, 'log-info');
 
     setTimeout(() => {
       switchAuthTab('confirmReset');
-      showConfirmResetFeedback(result.resetCode ? `💡 Código de Teste Local: ${result.resetCode}` : 'Digite o código de verificação enviado para seu e-mail.', 'is-warning');
+      showConfirmResetFeedback('📬 Digite o código de 6 dígitos enviado para o seu e-mail cadastrado.', 'is-warning');
       const codeField = document.getElementById('resetCodeInput');
-      if (codeField && result.resetCode) {
-        codeField.value = result.resetCode;
+      if (codeField) {
+        codeField.value = '';
+        codeField.focus();
       }
-    }, 1200);
+    }, 1000);
   } catch (err) {
     console.error('Erro na solicitação de recuperação:', err);
     showForgotFeedback(`⚠️ ${err.message || 'Falha ao solicitar recuperação de senha.'}`, 'is-error');

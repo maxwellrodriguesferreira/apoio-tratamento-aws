@@ -594,8 +594,7 @@ const UserDB = (function() {
       return {
         success: true,
         email: user.email,
-        resetCode: code,
-        message: `Código de verificação gerado: ${code}. Válido por 15 minutos.`
+        message: 'Código de verificação enviado para seu e-mail cadastrado. Válido por 15 minutos.'
       };
     },
 
