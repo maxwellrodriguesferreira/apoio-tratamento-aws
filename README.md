@@ -152,8 +152,10 @@ A aplicação é 100% estática, construída com JavaScript modular moderno (ES6
 | [`index.html`](file:///home/maxwell/terminal/index.html) | Estrutura semântica da aplicação, tela CRT, modais, formulários de autenticação/cadastro e painel administrativo. |
 | [`style.css`](file:///home/maxwell/terminal/style.css) | Design system CRT, scanlines, 4 temas visuais, badges de status, fila de envio em lote e responsividade mobile. |
 | [`app.js`](file:///home/maxwell/terminal/app.js) | Núcleo da CLI, motor de geração de mensagens, fila de disparos para WhatsApp, moderação RBAC e integração Gemini. |
-| [`app-config.js`](file:///home/maxwell/terminal/app-config.js) | Configuração central da aplicação e gestão segura da chave de API do Gemini. |
-| [`amplify.yml`](file:///home/maxwell/terminal/amplify.yml) | Especificação de build e deploy contínuo do AWS Amplify Hosting. |
+| [`cognito-auth.js`](file:///home/maxwell/terminal/cognito-auth.js) | Integração de autenticação com AWS Cognito User Pool (SDK Amazon Cognito Identity). |
+| [`user-db.js`](file:///home/maxwell/terminal/user-db.js) | Banco de dados seguro de usuários locais com criptografia PBKDF2/SHA-256 e auditoria. |
+| [`app-config.js`](file:///home/maxwell/terminal/app-config.js) | Configuração central da aplicação, gestão da chave Gemini e parâmetros do AWS Cognito. |
+| [`amplify.yml`](file:///home/maxwell/terminal/amplify.yml) | Especificação de build e deploy contínuo do AWS Amplify Hosting com injeção de variáveis de ambiente. |
 | [`customHttp.yml`](file:///home/maxwell/terminal/customHttp.yml) | Cabeçalhos de segurança HTTP (Cache-Control, X-Frame-Options, X-Content-Type-Options, etc.). |
 | [`test.js`](file:///home/maxwell/terminal/test.js) | Suíte completa de testes automatizados (parsers de IA, validações RBAC, URLs de WhatsApp e integridade). |
 
@@ -175,13 +177,15 @@ Para executar a suíte automatizada de validação:
 
 ```bash
 node --check app-config.js
+node --check user-db.js
+node --check cognito-auth.js
 node --check app.js
 node test.js
 ```
 
 ---
 
-## 🚀 Publicação e Deploy (AWS Amplify)
+## 🚀 Publicação e Deploy (AWS Amplify & AWS Cognito)
 
 Cada alteração enviada para a branch `main` é automaticamente construída e publicada pelo AWS Amplify Hosting:
 
@@ -191,13 +195,20 @@ git commit -m "feat: sua alteracao em portugues"
 git push
 ```
 
-Para injetar a chave da API do Gemini automaticamente durante o build da AWS:
-1. No console do **AWS Amplify**, vá em **App settings > Environment variables**.
-2. Adicione a variável `GEMINI_API_KEY` com o valor da sua chave.
-3. O script do `amplify.yml` injetará a chave automaticamente na aplicação a cada deploy.
+### Configuração de Variáveis de Ambiente no AWS Amplify Console
+No console do **AWS Amplify**, acesse **App settings > Environment variables** e configure:
+
+| Variável | Descrição | Exemplo |
+| :--- | :--- | :--- |
+| `GEMINI_API_KEY` | Chave da API do Google Gemini Flash obtida no Google AI Studio | `AIzaSy...` |
+| `COGNITO_REGION` | Região do seu AWS Cognito User Pool | `us-east-1` ou `sa-east-1` |
+| `COGNITO_USER_POOL_ID` | ID do seu User Pool no AWS Cognito | `us-east-1_xxxxxxxxx` |
+| `COGNITO_CLIENT_ID` | ID do App Client (sem client secret) do Cognito | `7abcdef1234567890abcdef` |
+| `ADMIN_USER` | E-mail do Administrador mestre da aplicação | `maxwellferreira@proton.me` |
+| `ADMIN_PASSWORD` | Senha inicial do Administrador mestre | `SuaSenhaSegura123` |
 
 ---
 
 ## 📌 Versão
 
-**4.0.0-AWS** — Migração para AWS Amplify Hosting, centralização da configuração do Google Gemini via `app-config.js` com suporte a variáveis de ambiente da AWS, eliminação de dependências do Firebase e garantia de 0 persistência de dados de clientes em banco de dados.
+**4.0.0-AWS** — Migração para AWS Amplify Hosting e AWS Cognito, centralização da configuração do Google Gemini via `app-config.js` com suporte a variáveis de ambiente da AWS, eliminação de dependências do Firebase e garantia de 0 persistência de dados de clientes em banco de dados.
