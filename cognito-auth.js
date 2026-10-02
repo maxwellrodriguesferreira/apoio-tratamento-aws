@@ -217,28 +217,6 @@ const CognitoAuth = (function() {
           return reject(new Error('Preencha o e-mail/usuário e a senha.'));
         }
 
-        const cfg = typeof window !== 'undefined' && window.AppConfig && typeof window.AppConfig.getAdminCredentials === 'function'
-          ? window.AppConfig.getAdminCredentials()
-          : { user: '', pass: '', name: '' };
-
-        // Se uma senha de build foi injetada no AWS Amplify e confere com a digitada
-        if (cfg.user && rawUser === cfg.user.toLowerCase() && cfg.pass && rawPass === cfg.pass) {
-          const adminEmail = cfg.user;
-          const adminName = cfg.name || 'Administrador Master';
-          return resolve({
-            user: {
-              uid: 'admin-master-001',
-              email: adminEmail,
-              name: adminName,
-              drogaria: 'Drogasil Mogilar',
-              role: 'admin',
-              status: 'approved',
-              provider: 'aws-admin'
-            },
-            status: 'approved'
-          });
-        }
-
         const userPool = getCognitoPool();
 
         // Se Cognito não estiver configurado com credenciais reais da AWS, utiliza banco local seguro

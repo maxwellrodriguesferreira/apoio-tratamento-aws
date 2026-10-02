@@ -775,23 +775,16 @@ async function handleLoginSubmit(e) {
     } else if (typeof window !== 'undefined' && window.UserDB && typeof window.UserDB.authenticateUser === 'function') {
       authResult = await window.UserDB.authenticateUser(rawUser, rawPass);
     } else {
-      // Fallback local caso módulos externos não instanciados
-      if (rawUser.toLowerCase() === DEFAULT_AUTH.user && rawPass === DEFAULT_AUTH.pass) {
-        authResult = {
-          user: { uid: 'admin-maxwell-001', name: 'Maxwell Rodrigues Ferreira', email: 'maxwellferreira@proton.me', role: 'admin', status: 'approved' },
-          status: 'approved'
-        };
-      } else {
-        const record = findUserRecord(rawUser);
-        if (!record) throw new Error('Usuário não encontrado.');
-        const status = normalizeStatus(record.status);
-        if (status !== 'approved' && record.role !== 'admin') {
-          const err = new Error('Seu cadastro está aguardando aprovação de um Administrador.');
-          err.code = 'PENDING_APPROVAL';
-          throw err;
-        }
-        authResult = { user: record, status: 'approved' };
+      // Fallback local apenas caso módulos externos não estejam disponíveis
+      const record = findUserRecord(rawUser);
+      if (!record) throw new Error('Usuário não encontrado.');
+      const status = normalizeStatus(record.status);
+      if (status !== 'approved' && record.role !== 'admin') {
+        const err = new Error('Seu cadastro está aguardando aprovação de um Administrador.');
+        err.code = 'PENDING_APPROVAL';
+        throw err;
       }
+      authResult = { user: record, status: 'approved' };
     }
 
     const authenticatedUser = authResult.user;

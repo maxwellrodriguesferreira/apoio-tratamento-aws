@@ -4,6 +4,8 @@ const app = fs.readFileSync('/home/maxwell/terminal/app.js', 'utf8');
 const html = fs.readFileSync('/home/maxwell/terminal/index.html', 'utf8');
 const css = fs.readFileSync('/home/maxwell/terminal/style.css', 'utf8');
 const appConfig = fs.readFileSync('/home/maxwell/terminal/app-config.js', 'utf8');
+const userDbCode = fs.readFileSync('/home/maxwell/terminal/user-db.js', 'utf8');
+const cognitoAuthCode = fs.readFileSync('/home/maxwell/terminal/cognito-auth.js', 'utf8');
 const amplifyYml = fs.readFileSync('/home/maxwell/terminal/amplify.yml', 'utf8');
 const customHttp = fs.readFileSync('/home/maxwell/terminal/customHttp.yml', 'utf8');
 
@@ -447,6 +449,75 @@ const checkPromoted = testContext.findUserRecord('lucas@drogasil.com.br');
 if (!checkPromoted || checkPromoted.role !== 'admin') {
   throw new Error('Falha no teste: Promoção de role para "admin" falhou.');
 }
+
+// 7. Teste de Ciclo de Vida de Senha & Revogação da Senha Antiga
+(async () => {
+  const crypto = require('crypto');
+  const userDbContext = {
+    console,
+    JSON,
+    Array,
+    Object,
+    String,
+    Number,
+    Boolean,
+    Date,
+    Math,
+    parseInt,
+    crypto: {
+      subtle: crypto.webcrypto.subtle,
+      getRandomValues: (arr) => crypto.webcrypto.getRandomValues(arr)
+    },
+    TextEncoder,
+    localStorage: {
+      data: {},
+      getItem(k) { return this.data[k] || null; },
+      setItem(k, v) { this.data[k] = String(v); },
+      removeItem(k) { delete this.data[k]; }
+    },
+    AppConfig: {
+      getAdminCredentials: () => ({ user: 'admin@drogasil.com.br', pass: 'admin123', name: 'Administrador' })
+    }
+  };
+  userDbContext.window = userDbContext;
+
+  vm.runInNewContext(userDbCode, userDbContext);
+  vm.runInNewContext(cognitoAuthCode, userDbContext);
+
+  const udb = userDbContext.UserDB;
+  const cauth = userDbContext.CognitoAuth;
+
+  // 7.1. Login inicial com senha padrão
+  const login1 = await cauth.signIn('admin@drogasil.com.br', 'admin123');
+  if (!login1 || !login1.user || login1.user.role !== 'admin') {
+    throw new Error('Falha no teste: Primeiro login do admin falhou.');
+  }
+
+  // 7.2. Usuário altera a senha para uma nova senha forte
+  await cauth.changePassword('admin@drogasil.com.br', 'admin123', 'NovaSenhaSegura456!');
+
+  // 7.3. Tenta autenticar com a NOVA senha -> DEVE TER SUCESSO
+  const loginNew = await cauth.signIn('admin@drogasil.com.br', 'NovaSenhaSegura456!');
+  if (!loginNew || !loginNew.user) {
+    throw new Error('Falha no teste: Login com nova senha alterada falhou.');
+  }
+
+  // 7.4. Tenta autenticar com a SENHA ANTIGA PADRÃO ("admin123") -> DEVE SER REJEITADO
+  let oldPassRejected = false;
+  try {
+    await cauth.signIn('admin@drogasil.com.br', 'admin123');
+  } catch (err) {
+    oldPassRejected = true;
+  }
+  if (!oldPassRejected) {
+    throw new Error('Falha de segurança crítica: A senha antiga padrão continuou sendo aceita após a alteração!');
+  }
+
+  console.log('✅ Teste de Segurança: Senha antiga padrão é devidamente bloqueada após alteração de senha.');
+})().catch(err => {
+  console.error(err);
+  process.exit(1);
+});
 
 console.log('✅ Todos os testes de controle de acesso, moderação (aprovar, rejeitar, bloquear, desbloquear, role, auditoria) e segurança foram aprovados com 100% de sucesso!');
 

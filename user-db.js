@@ -334,22 +334,10 @@ const UserDB = (function() {
       if (user.passwordHash && user.passwordSalt) {
         const isValid = await verifyPassword(cleanPass, user.passwordHash, user.passwordSalt);
         if (!isValid) {
-          // Permite login se a senha de ambiente da AWS Amplify foi injetada e corresponde
-          const cfg = typeof window !== 'undefined' && window.AppConfig && typeof window.AppConfig.getAdminCredentials === 'function'
-            ? window.AppConfig.getAdminCredentials()
-            : null;
-          const superList = getSuperAdmins();
-          if (superList.includes(user.email.toLowerCase()) && cfg && cfg.pass && cleanPass === cfg.pass) {
-            const rehashed = await hashPassword(cleanPass);
-            user.passwordHash = rehashed.hash;
-            user.passwordSalt = rehashed.salt;
-            persistUsersToStorage(users);
-          } else {
-            throw new Error('E-mail ou senha incorretos.');
-          }
+          throw new Error('E-mail ou senha incorretos.');
         }
       } else {
-        // Usuário sem hash de senha configurado
+        // Usuário sem hash de senha configurado (primeiro acesso inicial)
         const cfg = typeof window !== 'undefined' && window.AppConfig && typeof window.AppConfig.getAdminCredentials === 'function'
           ? window.AppConfig.getAdminCredentials()
           : null;
