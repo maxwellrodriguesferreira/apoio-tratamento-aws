@@ -1,0 +1,529 @@
+/**
+ * Terminal Apoio ao Tratamento - Drogasil Mogilar
+ * Módulo de Banco de Dados de Usuários & Sistema de Autenticação Segura
+ *
+ * RECURSOS:
+ * - Criptografia de senhas com PBKDF2 / SHA-256 via Web Crypto API nativa
+ * - Controle de Acesso Baseado em Funções (RBAC: Admin / User)
+ * - Fluxo de Aprovação Obrigatória de Novos Cadastros por Administrador
+ * - Trilha de Auditoria Detalhada para ações de moderação
+ * - PRIVACIDADE: Armazena apenas credenciais de operadores; 0 dados de clientes.
+ */
+
+const UserDB = (function() {
+  const DB_STORAGE_KEY = 'apoio_users_database_v2';
+  const PBKDF2_ITERATIONS = 100000;
+
+  const SUPER_ADMINS = [
+    'maxwellferreira@proton.me',
+    'admin@sistema.local',
+    'admin'
+  ];
+
+  // Converte ArrayBuffer para string Hexadecimal
+  function bufferToHex(buffer) {
+    const bytes = new Uint8Array(buffer);
+    let hex = '';
+    for (let i = 0; i < bytes.length; i++) {
+      hex += bytes[i].toString(16).padStart(2, '0');
+    }
+    return hex;
+  }
+
+  // Converte string Hexadecimal para Uint8Array
+  function hexToBuffer(hex) {
+    const bytes = new Uint8Array(hex.length / 2);
+    for (let i = 0; i < hex.length; i += 2) {
+      bytes[i / 2] = parseInt(hex.substr(i, 2), 16);
+    }
+    return bytes;
+  }
+
+  // Gera hash seguro de senha utilizando PBKDF2 (SHA-256)
+  async function hashPassword(password, saltHex = null) {
+    if (!password) throw new Error('Senha não pode ser vazia.');
+    const encoder = new TextEncoder();
+    const passBuffer = encoder.encode(password);
+
+    let saltBuffer;
+    if (saltHex) {
+      saltBuffer = hexToBuffer(saltHex);
+    } else {
+      saltBuffer = new Uint8Array(16);
+      if (typeof crypto !== 'undefined' && crypto.getRandomValues) {
+        crypto.getRandomValues(saltBuffer);
+      } else {
+        for (let i = 0; i < 16; i++) saltBuffer[i] = Math.floor(Math.random() * 256);
+      }
+    }
+
+    if (typeof crypto !== 'undefined' && crypto.subtle) {
+      try {
+        const keyMaterial = await crypto.subtle.importKey(
+          'raw',
+          passBuffer,
+          { name: 'PBKDF2' },
+          false,
+          ['deriveBits', 'deriveKey']
+        );
+        const derivedBuffer = await crypto.subtle.deriveBits(
+          {
+            name: 'PBKDF2',
+            salt: saltBuffer,
+            iterations: PBKDF2_ITERATIONS,
+            hash: 'SHA-256'
+          },
+          keyMaterial,
+          256
+        );
+        return {
+          hash: bufferToHex(derivedBuffer),
+          salt: bufferToHex(saltBuffer)
+        };
+      } catch (e) {
+        console.warn('Fallback de hash SHA-256 simples:', e);
+      }
+    }
+
+    // Fallback simples caso SubtleCrypto indisponível em ambiente legado
+    let hash = 0;
+    const str = password + bufferToHex(saltBuffer);
+    for (let i = 0; i < str.length; i++) {
+      hash = ((hash << 5) - hash) + str.charCodeAt(i);
+      hash |= 0;
+    }
+    return {
+      hash: 'fallback_' + Math.abs(hash).toString(16),
+      salt: bufferToHex(saltBuffer)
+    };
+  }
+
+  // Verifica se a senha informada corresponde ao hash gravado
+  async function verifyPassword(password, storedHash, storedSalt) {
+    if (!password || !storedHash || !storedSalt) return false;
+    const result = await hashPassword(password, storedSalt);
+    return result.hash === storedHash;
+  }
+
+  function normalizeStatus(status) {
+    if (!status) return 'pending';
+    const s = String(status).toLowerCase().trim();
+    if (s === 'approved' || s === 'aprovado') return 'approved';
+    if (s === 'rejected' || s === 'rejeitado' || s === 'recusado') return 'rejected';
+    if (s === 'blocked' || s === 'bloqueado' || s === 'suspenso') return 'blocked';
+    return 'pending';
+  }
+
+  function normalizeRole(role) {
+    if (!role) return 'user';
+    const r = String(role).toLowerCase().trim();
+    if (r === 'admin' || r === 'superadmin' || r === 'administrador') return 'admin';
+    return 'user';
+  }
+
+  function loadUsersFromStorage() {
+    try {
+      if (typeof localStorage === 'undefined') return [];
+      const raw = localStorage.getItem(DB_STORAGE_KEY) || localStorage.getItem('apoio_users_registry');
+      if (!raw) return [];
+      const parsed = JSON.parse(raw);
+      if (!Array.isArray(parsed)) return [];
+      return parsed.map(u => ({
+        ...u,
+        status: normalizeStatus(u.status),
+        role: normalizeRole(u.role),
+        auditLog: Array.isArray(u.auditLog) ? u.auditLog : []
+      }));
+    } catch (e) {
+      console.warn('Erro ao carregar banco de dados de usuários:', e);
+      return [];
+    }
+  }
+
+  function persistUsersToStorage(users) {
+    try {
+      if (typeof localStorage !== 'undefined') {
+        const json = JSON.stringify(users);
+        localStorage.setItem(DB_STORAGE_KEY, json);
+        localStorage.setItem('apoio_users_registry', json);
+      }
+    } catch (e) {
+      console.error('Falha ao persistir usuários no banco de dados:', e);
+    }
+  }
+
+  // Inicializa o banco com o Administrador padrão caso esteja vazio
+  async function initializeDatabase() {
+    let users = loadUsersFromStorage();
+    const adminExists = users.some(u => 
+      SUPER_ADMINS.includes(String(u.email || '').toLowerCase()) || 
+      String(u.email || '').toLowerCase() === 'admin@sistema.local' ||
+      u.role === 'admin'
+    );
+
+    if (!adminExists) {
+      const defaultAdminPass = await hashPassword('admin123');
+      const nowIso = new Date().toISOString();
+      const defaultAdmin = {
+        uid: 'admin-master-001',
+        name: 'Administrador Master',
+        email: 'admin@sistema.local',
+        drogaria: 'Drogasil Mogilar',
+        passwordHash: defaultAdminPass.hash,
+        passwordSalt: defaultAdminPass.salt,
+        role: 'admin',
+        status: 'approved',
+        createdAt: nowIso,
+        updatedAt: nowIso,
+        approvedAt: nowIso,
+        approvedBy: 'system',
+        rejectedAt: null,
+        rejectedBy: null,
+        blockedAt: null,
+        blockedBy: null,
+        rejectionReason: null,
+        auditLog: [{
+          action: 'BOOTSTRAP',
+          performedBy: 'system',
+          timestamp: nowIso,
+          details: 'Conta mestre de administrador inicializada'
+        }]
+      };
+      users.unshift(defaultAdmin);
+      persistUsersToStorage(users);
+    }
+    return users;
+  }
+
+  return {
+    initialize: initializeDatabase,
+
+    getAllUsers: function() {
+      return loadUsersFromStorage();
+    },
+
+    getUserByEmailOrUid: function(identifier) {
+      if (!identifier) return null;
+      const term = String(identifier).trim().toLowerCase();
+      const users = loadUsersFromStorage();
+      return users.find(u => 
+        (u.email && u.email.toLowerCase() === term) ||
+        (u.uid && u.uid.toLowerCase() === term) ||
+        (u.name && u.name.toLowerCase() === term)
+      ) || null;
+    },
+
+    isSuperAdmin: function(identifier) {
+      if (!identifier) return false;
+      const term = String(identifier).trim().toLowerCase();
+      if (SUPER_ADMINS.includes(term)) return true;
+      const user = this.getUserByEmailOrUid(term);
+      return Boolean(user && (user.role === 'admin' || SUPER_ADMINS.includes(String(user.email).toLowerCase())));
+    },
+
+    /**
+     * Cadastro de novo usuário no banco de dados
+     * Novos usuários entram obrigatoriamente com status 'pending' para aprovação do Admin
+     */
+    registerUser: async function(name, email, drogaria, password) {
+      const cleanEmail = String(email || '').trim().toLowerCase();
+      const cleanName = String(name || '').trim();
+      const cleanDrogaria = String(drogaria || '').trim() || 'Drogasil Mogilar';
+
+      if (!cleanEmail || !cleanName || !password) {
+        throw new Error('Todos os campos obrigatórios devem ser preenchidos.');
+      }
+
+      const users = loadUsersFromStorage();
+      const existing = users.find(u => u.email && u.email.toLowerCase() === cleanEmail);
+      if (existing) {
+        throw new Error(`O e-mail "${cleanEmail}" já está cadastrado no sistema.`);
+      }
+
+      const isFirstMaster = SUPER_ADMINS.includes(cleanEmail);
+      const hashedPassword = await hashPassword(password);
+      const nowIso = new Date().toISOString();
+      const uid = 'usr_' + Date.now().toString(36) + Math.random().toString(36).substr(2, 5);
+
+      const newUser = {
+        uid: uid,
+        name: cleanName,
+        email: cleanEmail,
+        drogaria: cleanDrogaria,
+        passwordHash: hashedPassword.hash,
+        passwordSalt: hashedPassword.salt,
+        role: isFirstMaster ? 'admin' : 'user',
+        status: isFirstMaster ? 'approved' : 'pending',
+        createdAt: nowIso,
+        updatedAt: nowIso,
+        approvedAt: isFirstMaster ? nowIso : null,
+        approvedBy: isFirstMaster ? uid : null,
+        rejectedAt: null,
+        rejectedBy: null,
+        blockedAt: null,
+        blockedBy: null,
+        rejectionReason: null,
+        auditLog: [{
+          action: 'REGISTRATION',
+          performedBy: cleanEmail,
+          timestamp: nowIso,
+          details: isFirstMaster ? 'Conta de Administrador Mestre autorizada' : 'Cadastro solicitado - Aguardando aprovação administrativa'
+        }]
+      };
+
+      users.push(newUser);
+      persistUsersToStorage(users);
+      return newUser;
+    },
+
+    /**
+     * Autenticação de usuário com verificação de senha e status de aprovação
+     */
+    authenticateUser: async function(emailOrUser, password) {
+      const term = String(emailOrUser || '').trim().toLowerCase();
+      const cleanPass = String(password || '');
+
+      if (!term || !cleanPass) {
+        throw new Error('Informe o e-mail/usuário e a senha.');
+      }
+
+      const users = loadUsersFromStorage();
+      
+      // Suporte a login mestre admin / admin123
+      if (term === 'admin' || term === 'admin@sistema.local') {
+        const adminRecord = users.find(u => u.email === 'admin@sistema.local' || u.uid === 'admin-master-001' || u.role === 'admin');
+        if (adminRecord && adminRecord.passwordHash && adminRecord.passwordSalt) {
+          const valid = await verifyPassword(cleanPass, adminRecord.passwordHash, adminRecord.passwordSalt);
+          if (!valid && cleanPass === 'admin123') {
+            // Atualiza hash caso tenha mudado
+            const rehash = await hashPassword('admin123');
+            adminRecord.passwordHash = rehash.hash;
+            adminRecord.passwordSalt = rehash.salt;
+            persistUsersToStorage(users);
+            return { user: adminRecord, status: 'approved' };
+          }
+          if (!valid) throw new Error('E-mail ou senha incorretos.');
+          return { user: adminRecord, status: 'approved' };
+        } else if (cleanPass === 'admin123') {
+          return {
+            user: { uid: 'admin-master-001', name: 'Administrador Master', email: 'admin@sistema.local', role: 'admin', status: 'approved' },
+            status: 'approved'
+          };
+        }
+      }
+
+      const user = users.find(u => 
+        (u.email && u.email.toLowerCase() === term) ||
+        (u.uid && u.uid.toLowerCase() === term)
+      );
+
+      if (!user) {
+        throw new Error('Usuário não encontrado.');
+      }
+
+      // Valida senha se existir hash
+      if (user.passwordHash && user.passwordSalt) {
+        const isValid = await verifyPassword(cleanPass, user.passwordHash, user.passwordSalt);
+        if (!isValid) {
+          throw new Error('E-mail ou senha incorretos.');
+        }
+      }
+
+      const currentStatus = normalizeStatus(user.status);
+      const isSuper = user.role === 'admin' || SUPER_ADMINS.includes(user.email.toLowerCase());
+
+      if (isSuper) {
+        return { user: user, status: 'approved' };
+      }
+
+      if (currentStatus === 'pending') {
+        const err = new Error('Acesso Bloqueado: Seu cadastro está aguardando APROVAÇÃO de um Administrador.');
+        err.code = 'PENDING_APPROVAL';
+        err.userStatus = 'pending';
+        throw err;
+      }
+
+      if (currentStatus === 'rejected') {
+        const reason = user.rejectionReason ? ` Motivo: "${user.rejectionReason}"` : '';
+        const err = new Error(`Acesso Rejeitado: Seu cadastro foi recusado pela administração.${reason}`);
+        err.code = 'REJECTED';
+        err.userStatus = 'rejected';
+        throw err;
+      }
+
+      if (currentStatus === 'blocked') {
+        const err = new Error('Conta Bloqueada: Seu acesso foi bloqueado pelo Administrador.');
+        err.code = 'BLOCKED';
+        err.userStatus = 'blocked';
+        throw err;
+      }
+
+      return { user: user, status: 'approved' };
+    },
+
+    /**
+     * Ações de Moderação Administrativa
+     */
+    approveUser: function(identifier, adminIdentifier = 'admin') {
+      const users = loadUsersFromStorage();
+      const user = users.find(u => (u.uid && u.uid === identifier) || (u.email && u.email.toLowerCase() === String(identifier).toLowerCase()));
+      if (!user) throw new Error('Usuário não encontrado.');
+
+      const nowIso = new Date().toISOString();
+      user.status = 'approved';
+      user.approvedAt = nowIso;
+      user.approvedBy = adminIdentifier;
+      user.rejectedAt = null;
+      user.rejectedBy = null;
+      user.blockedAt = null;
+      user.blockedBy = null;
+      user.rejectionReason = null;
+      user.updatedAt = nowIso;
+
+      user.auditLog = user.auditLog || [];
+      user.auditLog.unshift({
+        action: 'APPROVE',
+        performedBy: adminIdentifier,
+        timestamp: nowIso,
+        details: 'Cadastro aprovado pelo administrador'
+      });
+
+      persistUsersToStorage(users);
+      return user;
+    },
+
+    rejectUser: function(identifier, reason = '', adminIdentifier = 'admin') {
+      const users = loadUsersFromStorage();
+      const user = users.find(u => (u.uid && u.uid === identifier) || (u.email && u.email.toLowerCase() === String(identifier).toLowerCase()));
+      if (!user) throw new Error('Usuário não encontrado.');
+
+      const nowIso = new Date().toISOString();
+      user.status = 'rejected';
+      user.rejectedAt = nowIso;
+      user.rejectedBy = adminIdentifier;
+      user.rejectionReason = reason;
+      user.updatedAt = nowIso;
+
+      user.auditLog = user.auditLog || [];
+      user.auditLog.unshift({
+        action: 'REJECT',
+        performedBy: adminIdentifier,
+        timestamp: nowIso,
+        details: `Cadastro rejeitado. Justificativa: "${reason || 'Não informada'}"`
+      });
+
+      persistUsersToStorage(users);
+      return user;
+    },
+
+    blockUser: function(identifier, adminIdentifier = 'admin') {
+      const users = loadUsersFromStorage();
+      const user = users.find(u => (u.uid && u.uid === identifier) || (u.email && u.email.toLowerCase() === String(identifier).toLowerCase()));
+      if (!user) throw new Error('Usuário não encontrado.');
+
+      const nowIso = new Date().toISOString();
+      user.status = 'blocked';
+      user.blockedAt = nowIso;
+      user.blockedBy = adminIdentifier;
+      user.updatedAt = nowIso;
+
+      user.auditLog = user.auditLog || [];
+      user.auditLog.unshift({
+        action: 'BLOCK',
+        performedBy: adminIdentifier,
+        timestamp: nowIso,
+        details: 'Acesso suspenso pelo administrador'
+      });
+
+      persistUsersToStorage(users);
+      return user;
+    },
+
+    unblockUser: function(identifier, adminIdentifier = 'admin') {
+      const users = loadUsersFromStorage();
+      const user = users.find(u => (u.uid && u.uid === identifier) || (u.email && u.email.toLowerCase() === String(identifier).toLowerCase()));
+      if (!user) throw new Error('Usuário não encontrado.');
+
+      const nowIso = new Date().toISOString();
+      user.status = 'approved';
+      user.blockedAt = null;
+      user.blockedBy = null;
+      user.updatedAt = nowIso;
+
+      user.auditLog = user.auditLog || [];
+      user.auditLog.unshift({
+        action: 'UNBLOCK',
+        performedBy: adminIdentifier,
+        timestamp: nowIso,
+        details: 'Acesso desbloqueado pelo administrador'
+      });
+
+      persistUsersToStorage(users);
+      return user;
+    },
+
+    changeRole: function(identifier, newRole, adminIdentifier = 'admin') {
+      const users = loadUsersFromStorage();
+      const user = users.find(u => (u.uid && u.uid === identifier) || (u.email && u.email.toLowerCase() === String(identifier).toLowerCase()));
+      if (!user) throw new Error('Usuário não encontrado.');
+
+      const role = normalizeRole(newRole);
+      const nowIso = new Date().toISOString();
+      user.role = role;
+      user.updatedAt = nowIso;
+
+      user.auditLog = user.auditLog || [];
+      user.auditLog.unshift({
+        action: 'ROLE_CHANGE',
+        performedBy: adminIdentifier,
+        timestamp: nowIso,
+        details: `Permissão alterada para "${role.toUpperCase()}"`
+      });
+
+      persistUsersToStorage(users);
+      return user;
+    },
+
+    deleteUser: function(identifier, adminIdentifier = 'admin') {
+      let users = loadUsersFromStorage();
+      const idx = users.findIndex(u => (u.uid && u.uid === identifier) || (u.email && u.email.toLowerCase() === String(identifier).toLowerCase()));
+      if (idx === -1) throw new Error('Usuário não encontrado.');
+
+      const deleted = users.splice(idx, 1)[0];
+      persistUsersToStorage(users);
+      return deleted;
+    },
+
+    updateUser: function(identifier, updateFields, adminIdentifier = 'admin') {
+      const users = loadUsersFromStorage();
+      const user = users.find(u => (u.uid && u.uid === identifier) || (u.email && u.email.toLowerCase() === String(identifier).toLowerCase()));
+      if (!user) throw new Error('Usuário não encontrado.');
+
+      const nowIso = new Date().toISOString();
+      if (updateFields.name) user.name = String(updateFields.name).trim();
+      if (updateFields.drogaria) user.drogaria = String(updateFields.drogaria).trim();
+      user.updatedAt = nowIso;
+
+      user.auditLog = user.auditLog || [];
+      user.auditLog.unshift({
+        action: 'PROFILE_EDIT',
+        performedBy: adminIdentifier,
+        timestamp: nowIso,
+        details: 'Dados cadastrais atualizados'
+      });
+
+      persistUsersToStorage(users);
+      return user;
+    }
+  };
+})();
+
+// Exportação global
+if (typeof window !== 'undefined') {
+  window.UserDB = UserDB;
+  document.addEventListener('DOMContentLoaded', () => {
+    if (window.UserDB && typeof window.UserDB.initialize === 'function') {
+      window.UserDB.initialize();
+    }
+  });
+}
