@@ -1889,7 +1889,7 @@ function removeGeminiApiKey() {
 }
 
 const GEMINI_MODEL = (typeof window !== 'undefined' && window.AppConfig && typeof window.AppConfig.getGeminiModel === 'function') ? window.AppConfig.getGeminiModel() : 'gemini-2.5-flash';
-const GEMINI_MODEL_LABEL = 'Google Gemini Flash';
+const GEMINI_MODEL_LABEL = 'Google Gemini 3.6 Flash';
 const GEMINI_RESPONSE_SCHEMA = {
   type: 'OBJECT',
   properties: {
