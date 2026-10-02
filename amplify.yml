@@ -9,8 +9,6 @@ frontend:
       - '**/*'
     exclude:
       - '.git/**/*'
-      - '.firebase/**/*'
-      - 'firestore.rules'
       - 'README.md'
       - 'test.js'
   cache:
