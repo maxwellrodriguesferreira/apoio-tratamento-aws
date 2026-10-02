@@ -2619,26 +2619,40 @@ async function handleGeminiTest() {
     return;
   }
 
-  setGeminiConfigFeedback(`Testando conexão com o ${GEMINI_MODEL_LABEL}...`);
+  setGeminiConfigFeedback(`Testando conexão com a API do Google Gemini...`);
 
   try {
-    const response = await fetch(getGeminiEndpoint(testKey), {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        contents: [{ parts: [{ text: 'Responda apenas: OK' }] }],
-        generationConfig: { maxOutputTokens: 10 }
-      })
-    });
+    const modelsToTry = [activeGeminiModel, ...GEMINI_CANDIDATE_MODELS.filter(m => m !== activeGeminiModel)];
+    let connected = false;
+    let successfulModel = '';
 
-    if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}));
-      const message = errorData.error?.message || response.statusText || 'Não foi possível validar a chave.';
-      setGeminiConfigFeedback(`Falha (${response.status}): ${message}`, 'error');
-      return;
+    for (const m of modelsToTry) {
+      try {
+        const response = await fetch(getGeminiEndpoint(testKey, m), {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            contents: [{ parts: [{ text: 'OK' }] }],
+            generationConfig: { maxOutputTokens: 5 }
+          })
+        });
+
+        if (response.status === 404) continue;
+
+        if (response.ok) {
+          activeGeminiModel = m;
+          successfulModel = m;
+          connected = true;
+          break;
+        }
+      } catch (e) {}
     }
 
-    setGeminiConfigFeedback(`Conexão bem-sucedida: ${GEMINI_MODEL_LABEL} respondeu corretamente.`, 'success');
+    if (connected) {
+      setGeminiConfigFeedback(`Conexão bem-sucedida! Modelo ${successfulModel} ativo e pronto para uso.`, 'success');
+    } else {
+      setGeminiConfigFeedback(`Não foi possível validar a chave. Verifique se sua chave do Google AI Studio está ativa.`, 'error');
+    }
   } catch (error) {
     setGeminiConfigFeedback(`Erro de rede: ${error.message}. Verifique sua conexão e tente novamente.`, 'error');
   }

@@ -150,56 +150,39 @@ const UserDB = (function() {
     }
   }
 
-  // Inicializa o banco com o Administrador padrão caso esteja vazio
+  const RESET_FLAG_KEY = 'apoio_db_reset_v4';
+
+  // Inicializa o banco do zero (limpa resquícios antigos se necessário)
   async function initializeDatabase() {
+    try {
+      if (typeof localStorage !== 'undefined') {
+        const hasReset = localStorage.getItem(RESET_FLAG_KEY);
+        if (!hasReset) {
+          // Limpa todas as contas legadas para iniciar do zero
+          localStorage.removeItem(DB_STORAGE_KEY);
+          localStorage.removeItem('apoio_users_registry');
+          localStorage.removeItem('apoio_auth_session');
+          localStorage.setItem(RESET_FLAG_KEY, 'true');
+        }
+      }
+    } catch (e) {}
+
     let users = loadUsersFromStorage();
-    const nowIso = new Date().toISOString();
-
-    // Remove qualquer registro legado de admin@sistema.local
-    users = users.filter(u => u.email && u.email.toLowerCase() !== 'admin@sistema.local');
-
-    // Obtém configuração de senha de administrador caso injetada via AWS Amplify
-    const cfg = typeof window !== 'undefined' && window.AppConfig && typeof window.AppConfig.getAdminCredentials === 'function'
-      ? window.AppConfig.getAdminCredentials()
-      : null;
-    const adminPassHash = (cfg && cfg.pass) ? await hashPassword(cfg.pass) : null;
-
-    // Garante existência de maxwellferreira@proton.me como Administrador Mestre
-    const existingAdmin = users.find(u => u.email && u.email.toLowerCase() === 'maxwellferreira@proton.me');
-    if (!existingAdmin) {
-      users.unshift({
-        uid: 'admin-maxwell-001',
-        name: 'Maxwell Rodrigues Ferreira',
-        email: 'maxwellferreira@proton.me',
-        drogaria: 'Drogasil Mogilar',
-        passwordHash: adminPassHash ? adminPassHash.hash : null,
-        passwordSalt: adminPassHash ? adminPassHash.salt : null,
-        role: 'admin',
-        status: 'approved',
-        createdAt: nowIso,
-        updatedAt: nowIso,
-        approvedAt: nowIso,
-        approvedBy: 'system',
-        rejectedAt: null,
-        rejectedBy: null,
-        blockedAt: null,
-        blockedBy: null,
-        rejectionReason: null,
-        auditLog: [{
-          action: 'BOOTSTRAP',
-          performedBy: 'system',
-          timestamp: nowIso,
-          details: 'Conta de Administrador / Farmacêutico Responsável inicializada'
-        }]
-      });
-    }
-
     persistUsersToStorage(users);
     return users;
   }
 
   return {
     initialize: initializeDatabase,
+
+    clearAllUsers: function() {
+      if (typeof localStorage !== 'undefined') {
+        localStorage.removeItem(DB_STORAGE_KEY);
+        localStorage.removeItem('apoio_users_registry');
+        localStorage.removeItem('apoio_auth_session');
+      }
+      return [];
+    },
 
     getAllUsers: function() {
       return loadUsersFromStorage();
@@ -219,14 +202,18 @@ const UserDB = (function() {
     isSuperAdmin: function(identifier) {
       if (!identifier) return false;
       const term = String(identifier).trim().toLowerCase();
-      if (SUPER_ADMINS.includes(term)) return true;
-      const user = this.getUserByEmailOrUid(term);
-      return Boolean(user && (user.role === 'admin' || SUPER_ADMINS.includes(String(user.email).toLowerCase())));
+      const users = loadUsersFromStorage();
+      const user = users.find(u => 
+        (u.email && u.email.toLowerCase() === term) ||
+        (u.uid && u.uid.toLowerCase() === term)
+      );
+      return Boolean(user && user.role === 'admin');
     },
 
     /**
-     * Cadastro de novo usuário no banco de dados
-     * Novos usuários entram obrigatoriamente com status 'pending' para aprovação do Admin
+     * Cadastro de usuário no banco de dados.
+     * O 1º usuário da aplicação se torna AUTOMATICAMENTE o ADMINISTRADOR MASTER ('admin' / 'approved').
+     * Os demais entram como 'user' com status 'pending' para aprovação do Admin.
      */
     registerUser: async function(name, email, drogaria, password) {
       const cleanEmail = String(email || '').trim().toLowerCase();
@@ -243,7 +230,10 @@ const UserDB = (function() {
         throw new Error(`O e-mail "${cleanEmail}" já está cadastrado no sistema.`);
       }
 
-      const isFirstMaster = SUPER_ADMINS.includes(cleanEmail);
+      // Se for o primeiro usuário cadastrado ou não houver nenhum admin ativo, ele se torna Administrador
+      const hasAnyAdmin = users.some(u => u.role === 'admin' && u.status === 'approved');
+      const isFirstAdmin = !hasAnyAdmin || users.length === 0;
+
       const hashedPassword = await hashPassword(password);
       const nowIso = new Date().toISOString();
       const uid = 'usr_' + Date.now().toString(36) + Math.random().toString(36).substr(2, 5);
@@ -255,12 +245,12 @@ const UserDB = (function() {
         drogaria: cleanDrogaria,
         passwordHash: hashedPassword.hash,
         passwordSalt: hashedPassword.salt,
-        role: isFirstMaster ? 'admin' : 'user',
-        status: isFirstMaster ? 'approved' : 'pending',
+        role: isFirstAdmin ? 'admin' : 'user',
+        status: isFirstAdmin ? 'approved' : 'pending',
         createdAt: nowIso,
         updatedAt: nowIso,
-        approvedAt: isFirstMaster ? nowIso : null,
-        approvedBy: isFirstMaster ? uid : null,
+        approvedAt: isFirstAdmin ? nowIso : null,
+        approvedBy: isFirstAdmin ? 'system' : null,
         rejectedAt: null,
         rejectedBy: null,
         blockedAt: null,
@@ -270,7 +260,9 @@ const UserDB = (function() {
           action: 'REGISTRATION',
           performedBy: cleanEmail,
           timestamp: nowIso,
-          details: isFirstMaster ? 'Conta de Administrador Mestre autorizada' : 'Cadastro solicitado - Aguardando aprovação administrativa'
+          details: isFirstAdmin 
+            ? 'Primeiro Administrador Master cadastrado e aprovado automaticamente' 
+            : 'Cadastro solicitado - Aguardando aprovação administrativa'
         }]
       };
 
