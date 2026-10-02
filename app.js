@@ -363,27 +363,192 @@ function switchAuthTab(tab) {
   const tabRegisterBtn = document.getElementById('tabRegisterBtn');
   const loginForm = document.getElementById('loginForm');
   const registerForm = document.getElementById('registerForm');
+  const forgotPassForm = document.getElementById('forgotPassForm');
+  const confirmResetForm = document.getElementById('confirmResetForm');
   const loginBadge = document.getElementById('loginBadge');
   const noticeContent = document.getElementById('noticeContent');
+
+  // Esconde todos os formulários inicialmente
+  if (loginForm) loginForm.style.display = 'none';
+  if (registerForm) registerForm.style.display = 'none';
+  if (forgotPassForm) forgotPassForm.style.display = 'none';
+  if (confirmResetForm) confirmResetForm.style.display = 'none';
 
   if (tab === 'register') {
     if (tabLoginBtn) { tabLoginBtn.classList.remove('active'); tabLoginBtn.setAttribute('aria-selected', 'false'); }
     if (tabRegisterBtn) { tabRegisterBtn.classList.add('active'); tabRegisterBtn.setAttribute('aria-selected', 'true'); }
-    if (loginForm) loginForm.style.display = 'none';
     if (registerForm) registerForm.style.display = 'block';
     if (loginBadge) loginBadge.textContent = '📝 SOLICITAÇÃO DE ACESSO';
     if (noticeContent) noticeContent.textContent = 'Preencha seus dados para solicitar cadastro. O acesso depende de aprovação administrativa.';
     const regName = document.getElementById('regNameInput');
     setTimeout(() => regName?.focus(), 50);
+  } else if (tab === 'forgot') {
+    if (tabLoginBtn) { tabLoginBtn.classList.remove('active'); tabLoginBtn.setAttribute('aria-selected', 'false'); }
+    if (tabRegisterBtn) { tabRegisterBtn.classList.remove('active'); tabRegisterBtn.setAttribute('aria-selected', 'false'); }
+    if (forgotPassForm) forgotPassForm.style.display = 'block';
+    if (loginBadge) loginBadge.textContent = '🔑 RECUPERAÇÃO DE SENHA';
+    if (noticeContent) noticeContent.textContent = 'Informe o e-mail cadastrado para gerar o código de recuperação e redefinir sua senha.';
+    const forgotEmail = document.getElementById('forgotEmailInput');
+    setTimeout(() => forgotEmail?.focus(), 50);
+  } else if (tab === 'confirmReset') {
+    if (tabLoginBtn) { tabLoginBtn.classList.remove('active'); tabLoginBtn.setAttribute('aria-selected', 'false'); }
+    if (tabRegisterBtn) { tabRegisterBtn.classList.remove('active'); tabRegisterBtn.setAttribute('aria-selected', 'false'); }
+    if (confirmResetForm) confirmResetForm.style.display = 'block';
+    if (loginBadge) loginBadge.textContent = '🔒 DEFINIR NOVA SENHA';
+    if (noticeContent) noticeContent.textContent = 'Digite o código de verificação recebido e cadastre a sua nova senha.';
+    const resetCode = document.getElementById('resetCodeInput');
+    setTimeout(() => resetCode?.focus(), 50);
   } else {
     if (tabRegisterBtn) { tabRegisterBtn.classList.remove('active'); tabRegisterBtn.setAttribute('aria-selected', 'false'); }
     if (tabLoginBtn) { tabLoginBtn.classList.add('active'); tabLoginBtn.setAttribute('aria-selected', 'true'); }
-    if (registerForm) registerForm.style.display = 'none';
     if (loginForm) loginForm.style.display = 'block';
     if (loginBadge) loginBadge.textContent = '🔒 ACESSO RESTRITO';
     if (noticeContent) noticeContent.textContent = 'Autenticação obrigatória. Apenas usuários aprovados podem acessar prontuários e recursos.';
     const userInput = document.getElementById('loginUserInput');
     setTimeout(() => userInput?.focus(), 50);
+  }
+}
+
+function showForgotFeedback(message, type = '') {
+  const el = document.getElementById('forgotFeedback');
+  if (!el) return;
+  el.className = `login-feedback ${type}`;
+  el.textContent = message;
+}
+
+function showConfirmResetFeedback(message, type = '') {
+  const el = document.getElementById('confirmResetFeedback');
+  if (!el) return;
+  el.className = `login-feedback ${type}`;
+  el.textContent = message;
+}
+
+let pendingResetEmail = '';
+
+async function handleForgotPasswordSubmit(e) {
+  if (e) e.preventDefault();
+  const emailInput = document.getElementById('forgotEmailInput');
+  const submitBtn = document.getElementById('forgotSubmitBtn');
+  const loginCard = document.querySelector('.login-card');
+  const email = emailInput?.value.trim().toLowerCase();
+
+  if (!email) {
+    showForgotFeedback('⚠️ Por favor, informe seu e-mail cadastrado.', 'is-error');
+    triggerCardShake(loginCard);
+    return;
+  }
+
+  if (submitBtn) submitBtn.disabled = true;
+  showForgotFeedback('🔄 Processando solicitação de recuperação...', 'is-warning');
+
+  try {
+    let result = null;
+    if (typeof window !== 'undefined' && window.CognitoAuth && typeof window.CognitoAuth.forgotPassword === 'function') {
+      result = await window.CognitoAuth.forgotPassword(email);
+    } else if (typeof window !== 'undefined' && window.UserDB && typeof window.UserDB.requestPasswordReset === 'function') {
+      result = await window.UserDB.requestPasswordReset(email);
+    } else {
+      throw new Error('Módulo de autenticação indisponível.');
+    }
+
+    pendingResetEmail = email;
+    showForgotFeedback(`✅ ${result.message || 'Código de verificação gerado com sucesso!'}`, 'is-success');
+    appendLog(`🔑 <strong>Recuperação de Senha:</strong> Código de verificação gerado para <strong>${escapeHTML(email)}</strong>.`, 'log-info');
+
+    setTimeout(() => {
+      switchAuthTab('confirmReset');
+      showConfirmResetFeedback(result.resetCode ? `💡 Código de Teste Local: ${result.resetCode}` : 'Digite o código de verificação enviado para seu e-mail.', 'is-warning');
+      const codeField = document.getElementById('resetCodeInput');
+      if (codeField && result.resetCode) {
+        codeField.value = result.resetCode;
+      }
+    }, 1200);
+  } catch (err) {
+    console.error('Erro na solicitação de recuperação:', err);
+    showForgotFeedback(`⚠️ ${err.message || 'Falha ao solicitar recuperação de senha.'}`, 'is-error');
+    triggerCardShake(loginCard);
+  } finally {
+    if (submitBtn) submitBtn.disabled = false;
+  }
+}
+
+async function handleConfirmResetSubmit(e) {
+  if (e) e.preventDefault();
+  const codeInput = document.getElementById('resetCodeInput');
+  const newPassInput = document.getElementById('resetNewPassInput');
+  const confirmPassInput = document.getElementById('resetConfirmPassInput');
+  const submitBtn = document.getElementById('confirmResetSubmitBtn');
+  const loginCard = document.querySelector('.login-card');
+
+  const code = codeInput?.value.trim();
+  const newPass = newPassInput?.value;
+  const confirmPass = confirmPassInput?.value;
+  const targetEmail = pendingResetEmail || document.getElementById('forgotEmailInput')?.value.trim().toLowerCase() || document.getElementById('loginUserInput')?.value.trim().toLowerCase();
+
+  if (!targetEmail || !code || !newPass || !confirmPass) {
+    showConfirmResetFeedback('⚠️ Por favor, preencha todos os campos obrigatórios.', 'is-error');
+    triggerCardShake(loginCard);
+    return;
+  }
+
+  if (newPass.length < 6) {
+    showConfirmResetFeedback('⚠️ A nova senha deve conter pelo menos 6 caracteres.', 'is-error');
+    triggerCardShake(loginCard);
+    return;
+  }
+
+  if (newPass !== confirmPass) {
+    showConfirmResetFeedback('⚠️ A confirmação não confere com a nova senha digitada.', 'is-error');
+    triggerCardShake(loginCard);
+    return;
+  }
+
+  if (submitBtn) submitBtn.disabled = true;
+  showConfirmResetFeedback('🔄 Atualizando sua senha com segurança...', 'is-warning');
+
+  try {
+    let res = null;
+    if (typeof window !== 'undefined' && window.CognitoAuth && typeof window.CognitoAuth.confirmPassword === 'function') {
+      res = await window.CognitoAuth.confirmPassword(targetEmail, code, newPass);
+    } else if (typeof window !== 'undefined' && window.UserDB && typeof window.UserDB.confirmPasswordReset === 'function') {
+      res = await window.UserDB.confirmPasswordReset(targetEmail, code, newPass);
+    } else {
+      throw new Error('Módulo de autenticação indisponível.');
+    }
+
+    showConfirmResetFeedback('🎉 Senha redefinida com sucesso! Redirecionando para login...', 'is-success');
+    appendLog(`✅ <strong>Senha Redefinida:</strong> O usuário <strong>${escapeHTML(targetEmail)}</strong> atualizou sua senha com sucesso.`, 'log-success');
+
+    if (codeInput) codeInput.value = '';
+    if (newPassInput) newPassInput.value = '';
+    if (confirmPassInput) confirmPassInput.value = '';
+
+    setTimeout(() => {
+      switchAuthTab('login');
+      const loginUserInput = document.getElementById('loginUserInput');
+      if (loginUserInput) loginUserInput.value = targetEmail;
+      showLoginFeedback('✅ Senha redefinida com sucesso! Digite sua nova senha para entrar.', 'is-success');
+      const passField = document.getElementById('loginPassInput');
+      setTimeout(() => passField?.focus(), 100);
+    }, 1500);
+  } catch (err) {
+    console.error('Erro ao redefinir senha:', err);
+    showConfirmResetFeedback(`⚠️ ${err.message || 'Falha ao redefinir senha.'}`, 'is-error');
+    triggerCardShake(loginCard);
+  } finally {
+    if (submitBtn) submitBtn.disabled = false;
+  }
+}
+
+function toggleResetPassVisibility() {
+  const passInput = document.getElementById('resetNewPassInput');
+  const toggleBtn = document.getElementById('resetPassToggle');
+  if (!passInput) return;
+  const isPass = passInput.type === 'password';
+  passInput.type = isPass ? 'text' : 'password';
+  if (toggleBtn) {
+    toggleBtn.textContent = isPass ? '🙈' : '👁️';
+    toggleBtn.setAttribute('aria-pressed', isPass ? 'true' : 'false');
   }
 }
 
@@ -1442,14 +1607,27 @@ async function initializeAuth() {
   const adminSearchInput = document.getElementById('adminSearchInput');
   const adminSearchClearBtn = document.getElementById('adminSearchClearBtn');
 
+  const forgotPassLinkBtn = document.getElementById('forgotPassLinkBtn');
+  const forgotPassForm = document.getElementById('forgotPassForm');
+  const confirmResetForm = document.getElementById('confirmResetForm');
+  const forgotBackToLoginBtn = document.getElementById('forgotBackToLoginBtn');
+  const confirmResetBackBtn = document.getElementById('confirmResetBackBtn');
+  const resetPassToggle = document.getElementById('resetPassToggle');
+
   if (tabLoginBtn) tabLoginBtn.addEventListener('click', () => switchAuthTab('login'));
   if (tabRegisterBtn) tabRegisterBtn.addEventListener('click', () => switchAuthTab('register'));
+  if (forgotPassLinkBtn) forgotPassLinkBtn.addEventListener('click', () => switchAuthTab('forgot'));
+  if (forgotBackToLoginBtn) forgotBackToLoginBtn.addEventListener('click', () => switchAuthTab('login'));
+  if (confirmResetBackBtn) confirmResetBackBtn.addEventListener('click', () => switchAuthTab('forgot'));
 
   if (loginForm) loginForm.addEventListener('submit', handleLoginSubmit);
   if (registerForm) registerForm.addEventListener('submit', handleRegisterSubmit);
+  if (forgotPassForm) forgotPassForm.addEventListener('submit', handleForgotPasswordSubmit);
+  if (confirmResetForm) confirmResetForm.addEventListener('submit', handleConfirmResetSubmit);
 
   if (loginPassToggle) loginPassToggle.addEventListener('click', toggleLoginPassVisibility);
   if (regPassToggle) regPassToggle.addEventListener('click', toggleRegisterPassVisibility);
+  if (resetPassToggle) resetPassToggle.addEventListener('click', toggleResetPassVisibility);
 
   if (loginThemeBtn) loginThemeBtn.addEventListener('click', toggleTheme);
   if (loginAboutBtn) loginAboutBtn.addEventListener('click', openLoginAboutModal);

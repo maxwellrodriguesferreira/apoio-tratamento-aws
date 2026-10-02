@@ -1167,6 +1167,25 @@ button, input, select, textarea, a {
   align-items: center;
   margin-bottom: 16px;
   font-size: 0.82rem;
+  gap: 12px;
+}
+
+.auth-link-btn {
+  background: transparent;
+  border: none;
+  color: var(--prompt-color);
+  font-family: inherit;
+  font-size: 0.82rem;
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  transition: color 0.15s ease, opacity 0.15s ease;
+  padding: 0;
+}
+
+.auth-link-btn:hover {
+  color: var(--text-bright);
+  opacity: 0.9;
 }
 
 .login-checkbox-label {

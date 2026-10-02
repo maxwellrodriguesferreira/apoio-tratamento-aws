@@ -509,6 +509,162 @@ const UserDB = (function() {
 
       persistUsersToStorage(users);
       return user;
+    },
+
+    /**
+     * Solicitação de redefinição de senha (gera código de verificação de 6 dígitos)
+     */
+    requestPasswordReset: async function(email) {
+      const cleanEmail = String(email || '').trim().toLowerCase();
+      if (!cleanEmail) throw new Error('Informe o e-mail cadastrado.');
+
+      const users = loadUsersFromStorage();
+      const user = users.find(u => (u.email && u.email.toLowerCase() === cleanEmail) || (u.uid && u.uid.toLowerCase() === cleanEmail));
+      if (!user) throw new Error(`Nenhum usuário encontrado com o e-mail "${cleanEmail}".`);
+
+      const code = Math.floor(100000 + Math.random() * 900000).toString();
+      const expires = Date.now() + 15 * 60 * 1000; // 15 minutos
+      const nowIso = new Date().toISOString();
+
+      user.resetCode = code;
+      user.resetCodeExpires = expires;
+      user.updatedAt = nowIso;
+      user.auditLog = user.auditLog || [];
+      user.auditLog.unshift({
+        action: 'PASSWORD_RESET_REQUESTED',
+        performedBy: cleanEmail,
+        timestamp: nowIso,
+        details: 'Código de recuperação de senha gerado'
+      });
+
+      persistUsersToStorage(users);
+      return {
+        success: true,
+        email: user.email,
+        resetCode: code,
+        message: `Código de verificação gerado: ${code}. Válido por 15 minutos.`
+      };
+    },
+
+    /**
+     * Confirmação de redefinição de senha com código de verificação
+     */
+    confirmPasswordReset: async function(email, resetCode, newPassword) {
+      const cleanEmail = String(email || '').trim().toLowerCase();
+      const cleanCode = String(resetCode || '').trim();
+      const cleanPass = String(newPassword || '');
+
+      if (!cleanEmail || !cleanCode || !cleanPass) {
+        throw new Error('Todos os campos são obrigatórios.');
+      }
+      if (cleanPass.length < 6) {
+        throw new Error('A nova senha deve ter no mínimo 6 caracteres.');
+      }
+
+      const users = loadUsersFromStorage();
+      const user = users.find(u => (u.email && u.email.toLowerCase() === cleanEmail) || (u.uid && u.uid.toLowerCase() === cleanEmail));
+      if (!user) throw new Error('Usuário não encontrado.');
+
+      if (!user.resetCode || user.resetCode !== cleanCode) {
+        throw new Error('Código de verificação inválido ou incorreto.');
+      }
+      if (user.resetCodeExpires && Date.now() > user.resetCodeExpires) {
+        throw new Error('O código de verificação expirou. Solicite um novo.');
+      }
+
+      const hashedPassword = await hashPassword(cleanPass);
+      const nowIso = new Date().toISOString();
+
+      user.passwordHash = hashedPassword.hash;
+      user.passwordSalt = hashedPassword.salt;
+      user.resetCode = null;
+      user.resetCodeExpires = null;
+      user.updatedAt = nowIso;
+
+      user.auditLog = user.auditLog || [];
+      user.auditLog.unshift({
+        action: 'PASSWORD_RESET_CONFIRMED',
+        performedBy: cleanEmail,
+        timestamp: nowIso,
+        details: 'Senha redefinida com sucesso pelo usuário'
+      });
+
+      persistUsersToStorage(users);
+      return {
+        success: true,
+        message: 'Sua senha foi redefinida com sucesso! Você já pode entrar no sistema.'
+      };
+    },
+
+    /**
+     * Redefinição direta de senha pelo Administrador Master
+     */
+    adminResetPassword: async function(identifier, newPassword, adminIdentifier = 'admin') {
+      const cleanPass = String(newPassword || '');
+      if (cleanPass.length < 6) {
+        throw new Error('A nova senha deve ter no mínimo 6 caracteres.');
+      }
+
+      const users = loadUsersFromStorage();
+      const user = users.find(u => (u.uid && u.uid === identifier) || (u.email && u.email.toLowerCase() === String(identifier).toLowerCase()));
+      if (!user) throw new Error('Usuário não encontrado.');
+
+      const hashedPassword = await hashPassword(cleanPass);
+      const nowIso = new Date().toISOString();
+
+      user.passwordHash = hashedPassword.hash;
+      user.passwordSalt = hashedPassword.salt;
+      user.resetCode = null;
+      user.resetCodeExpires = null;
+      user.updatedAt = nowIso;
+
+      user.auditLog = user.auditLog || [];
+      user.auditLog.unshift({
+        action: 'ADMIN_RESET_PASSWORD',
+        performedBy: adminIdentifier,
+        timestamp: nowIso,
+        details: 'Senha redefinida pelo Administrador'
+      });
+
+      persistUsersToStorage(users);
+      return user;
+    },
+
+    /**
+     * Alteração de senha pelo próprio usuário autenticado
+     */
+    updatePassword: async function(identifier, oldPassword, newPassword) {
+      const cleanNew = String(newPassword || '');
+      if (cleanNew.length < 6) {
+        throw new Error('A nova senha deve ter no mínimo 6 caracteres.');
+      }
+
+      const users = loadUsersFromStorage();
+      const user = users.find(u => (u.uid && u.uid === identifier) || (u.email && u.email.toLowerCase() === String(identifier).toLowerCase()));
+      if (!user) throw new Error('Usuário não encontrado.');
+
+      if (user.passwordHash && user.passwordSalt) {
+        const isValid = await verifyPassword(oldPassword, user.passwordHash, user.passwordSalt);
+        if (!isValid) throw new Error('A senha atual informada está incorreta.');
+      }
+
+      const hashedPassword = await hashPassword(cleanNew);
+      const nowIso = new Date().toISOString();
+
+      user.passwordHash = hashedPassword.hash;
+      user.passwordSalt = hashedPassword.salt;
+      user.updatedAt = nowIso;
+
+      user.auditLog = user.auditLog || [];
+      user.auditLog.unshift({
+        action: 'PASSWORD_UPDATED',
+        performedBy: user.email,
+        timestamp: nowIso,
+        details: 'Senha alterada pelo usuário'
+      });
+
+      persistUsersToStorage(users);
+      return { success: true, message: 'Senha atualizada com sucesso!' };
     }
   };
 })();

@@ -293,6 +293,98 @@ const CognitoAuth = (function() {
           currentUser.signOut();
         }
       }
+    },
+
+    /**
+     * Solicitação de recuperação de senha (AWS Cognito / Fallback UserDB)
+     */
+    forgotPassword: function(email) {
+      return new Promise((resolve, reject) => {
+        const cleanEmail = String(email || '').trim().toLowerCase();
+        if (!cleanEmail) return reject(new Error('Informe o e-mail cadastrado.'));
+
+        const userPool = getCognitoPool();
+        if (!userPool) {
+          if (typeof window !== 'undefined' && window.UserDB && typeof window.UserDB.requestPasswordReset === 'function') {
+            return window.UserDB.requestPasswordReset(cleanEmail)
+              .then(resolve)
+              .catch(reject);
+          }
+          return reject(new Error('Serviço de recuperação indisponível.'));
+        }
+
+        const userData = {
+          Username: cleanEmail,
+          Pool: userPool
+        };
+        const cognitoUser = new AmazonCognitoIdentity.CognitoUser(userData);
+
+        cognitoUser.forgotPassword({
+          onSuccess: function(data) {
+            resolve({ success: true, message: 'Código de recuperação enviado para seu e-mail cadastrado.', data });
+          },
+          onFailure: function(err) {
+            let msg = err.message || 'Falha ao solicitar recuperação de senha.';
+            if (err.code === 'UserNotFoundException') {
+              msg = `Nenhum usuário encontrado com o e-mail "${cleanEmail}".`;
+            }
+            const error = new Error(msg);
+            error.code = err.code;
+            reject(error);
+          },
+          inputVerificationCode: function(data) {
+            resolve({ success: true, message: 'Código de verificação enviado para seu e-mail.', data, requiresCode: true });
+          }
+        });
+      });
+    },
+
+    /**
+     * Confirmação da nova senha com código de verificação
+     */
+    confirmPassword: function(email, verificationCode, newPassword) {
+      return new Promise((resolve, reject) => {
+        const cleanEmail = String(email || '').trim().toLowerCase();
+        const cleanCode = String(verificationCode || '').trim();
+        const cleanPass = String(newPassword || '');
+
+        if (!cleanEmail || !cleanCode || !cleanPass) {
+          return reject(new Error('Todos os campos são obrigatórios.'));
+        }
+
+        const userPool = getCognitoPool();
+        if (!userPool) {
+          if (typeof window !== 'undefined' && window.UserDB && typeof window.UserDB.confirmPasswordReset === 'function') {
+            return window.UserDB.confirmPasswordReset(cleanEmail, cleanCode, cleanPass)
+              .then(resolve)
+              .catch(reject);
+          }
+          return reject(new Error('Serviço de recuperação indisponível.'));
+        }
+
+        const userData = {
+          Username: cleanEmail,
+          Pool: userPool
+        };
+        const cognitoUser = new AmazonCognitoIdentity.CognitoUser(userData);
+
+        cognitoUser.confirmPassword(cleanCode, cleanPass, {
+          onSuccess: function() {
+            resolve({ success: true, message: 'Sua senha foi redefinida com sucesso! Você já pode entrar no sistema.' });
+          },
+          onFailure: function(err) {
+            let msg = err.message || 'Falha ao redefinir a senha.';
+            if (err.code === 'CodeMismatchException') {
+              msg = 'Código de verificação incorreto ou inválido.';
+            } else if (err.code === 'ExpiredCodeException') {
+              msg = 'O código de verificação expirou. Solicite um novo.';
+            }
+            const error = new Error(msg);
+            error.code = err.code;
+            reject(error);
+          }
+        });
+      });
     }
   };
 })();
