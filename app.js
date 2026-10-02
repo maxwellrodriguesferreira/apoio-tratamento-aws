@@ -57,15 +57,23 @@ if (typeof window !== 'undefined' && typeof localStorage !== 'undefined') {
   } catch (e) {}
 }
 
-const SUPER_ADMIN_EMAILS = [
-  'maxwellferreira@proton.me'
-];
+const SUPER_ADMIN_EMAILS = (function() {
+  const cfg = typeof window !== 'undefined' && window.AppConfig && typeof window.AppConfig.getAdminCredentials === 'function'
+    ? window.AppConfig.getAdminCredentials()
+    : null;
+  return cfg && cfg.user ? [cfg.user.toLowerCase()] : [];
+})();
 
-const DEFAULT_AUTH = {
-  user: 'maxwellferreira@proton.me',
-  pass: '',
-  name: 'Maxwell Rodrigues Ferreira'
-};
+const DEFAULT_AUTH = (function() {
+  const cfg = typeof window !== 'undefined' && window.AppConfig && typeof window.AppConfig.getAdminCredentials === 'function'
+    ? window.AppConfig.getAdminCredentials()
+    : null;
+  return {
+    user: cfg?.user || '',
+    pass: cfg?.pass || '',
+    name: cfg?.name || 'Administrador Master'
+  };
+})();
 
 const USERS_STORAGE_KEY = 'apoio_users_registry';
 

@@ -14,9 +14,16 @@ const UserDB = (function() {
   const DB_STORAGE_KEY = 'apoio_users_database_v2';
   const PBKDF2_ITERATIONS = 100000;
 
-  const SUPER_ADMINS = [
-    'maxwellferreira@proton.me'
-  ];
+  function getSuperAdmins() {
+    const list = [];
+    const cfg = typeof window !== 'undefined' && window.AppConfig && typeof window.AppConfig.getAdminCredentials === 'function'
+      ? window.AppConfig.getAdminCredentials()
+      : null;
+    if (cfg && cfg.user) {
+      list.push(cfg.user.toLowerCase());
+    }
+    return list;
+  }
 
   // Converte ArrayBuffer para string Hexadecimal
   function bufferToHex(buffer) {
@@ -292,7 +299,8 @@ const UserDB = (function() {
 
       if (!user) {
         // Se for o super admin e ainda não existir no registro, cria o registro
-        if (SUPER_ADMINS.includes(term)) {
+        const superList = getSuperAdmins();
+        if (superList.includes(term)) {
           const cfg = typeof window !== 'undefined' && window.AppConfig && typeof window.AppConfig.getAdminCredentials === 'function'
             ? window.AppConfig.getAdminCredentials()
             : null;
@@ -300,9 +308,9 @@ const UserDB = (function() {
             const nowIso = new Date().toISOString();
             const hashed = await hashPassword(cleanPass);
             const adminUser = {
-              uid: 'admin-maxwell-001',
-              name: 'Maxwell Rodrigues Ferreira',
-              email: 'maxwellferreira@proton.me',
+              uid: 'admin-master-001',
+              name: cfg.name || 'Administrador Master',
+              email: cfg.user || term,
               drogaria: 'Drogasil Mogilar',
               passwordHash: hashed.hash,
               passwordSalt: hashed.salt,
@@ -330,7 +338,8 @@ const UserDB = (function() {
           const cfg = typeof window !== 'undefined' && window.AppConfig && typeof window.AppConfig.getAdminCredentials === 'function'
             ? window.AppConfig.getAdminCredentials()
             : null;
-          if (SUPER_ADMINS.includes(user.email.toLowerCase()) && cfg && cfg.pass && cleanPass === cfg.pass) {
+          const superList = getSuperAdmins();
+          if (superList.includes(user.email.toLowerCase()) && cfg && cfg.pass && cleanPass === cfg.pass) {
             const rehashed = await hashPassword(cleanPass);
             user.passwordHash = rehashed.hash;
             user.passwordSalt = rehashed.salt;
@@ -344,7 +353,8 @@ const UserDB = (function() {
         const cfg = typeof window !== 'undefined' && window.AppConfig && typeof window.AppConfig.getAdminCredentials === 'function'
           ? window.AppConfig.getAdminCredentials()
           : null;
-        if (SUPER_ADMINS.includes(user.email.toLowerCase()) && cfg && cfg.pass && cleanPass === cfg.pass) {
+        const superList = getSuperAdmins();
+        if (superList.includes(user.email.toLowerCase()) && cfg && cfg.pass && cleanPass === cfg.pass) {
           const hashed = await hashPassword(cleanPass);
           user.passwordHash = hashed.hash;
           user.passwordSalt = hashed.salt;
@@ -355,7 +365,8 @@ const UserDB = (function() {
       }
 
       const currentStatus = normalizeStatus(user.status);
-      const isSuper = user.role === 'admin' || SUPER_ADMINS.includes(user.email.toLowerCase());
+      const superList = getSuperAdmins();
+      const isSuper = user.role === 'admin' || superList.includes(user.email.toLowerCase());
 
       if (isSuper) {
         return { user: user, status: 'approved' };
@@ -552,11 +563,15 @@ const UserDB = (function() {
       let user = users.find(u => (u.email && u.email.toLowerCase() === cleanEmail) || (u.uid && u.uid.toLowerCase() === cleanEmail));
       
       if (!user) {
-        if (SUPER_ADMINS.includes(cleanEmail)) {
+        const superList = getSuperAdmins();
+        if (superList.includes(cleanEmail) || users.length === 0) {
+          const cfg = typeof window !== 'undefined' && window.AppConfig && typeof window.AppConfig.getAdminCredentials === 'function'
+            ? window.AppConfig.getAdminCredentials()
+            : null;
           const nowIso = new Date().toISOString();
           user = {
-            uid: 'admin-maxwell-001',
-            name: 'Maxwell Rodrigues Ferreira',
+            uid: 'admin-master-001',
+            name: cfg?.name || 'Administrador Master',
             email: cleanEmail,
             drogaria: 'Drogasil Mogilar',
             passwordHash: '',

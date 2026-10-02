@@ -154,11 +154,13 @@ const AppConfig = {
   getAdminCredentials: function() {
     const user = (APP_CONFIG.adminUser && !APP_CONFIG.adminUser.includes('PLACEHOLDER')) 
       ? APP_CONFIG.adminUser.trim() 
-      : 'maxwellferreira@proton.me';
+      : '';
     const pass = (APP_CONFIG.adminPassword && !APP_CONFIG.adminPassword.includes('PLACEHOLDER')) 
       ? APP_CONFIG.adminPassword.trim() 
       : '';
-    const name = APP_CONFIG.adminName || 'Maxwell Rodrigues Ferreira';
+    const name = (APP_CONFIG.adminName && !APP_CONFIG.adminName.includes('PLACEHOLDER'))
+      ? APP_CONFIG.adminName.trim()
+      : 'Administrador Master';
     return { user, pass, name };
   },
 

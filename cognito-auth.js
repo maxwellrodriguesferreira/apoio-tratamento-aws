@@ -11,9 +11,16 @@
  */
 
 const CognitoAuth = (function() {
-  const SUPER_ADMINS = [
-    'maxwellferreira@proton.me'
-  ];
+  function getSuperAdmins() {
+    const list = [];
+    const cfg = typeof window !== 'undefined' && window.AppConfig && typeof window.AppConfig.getAdminCredentials === 'function'
+      ? window.AppConfig.getAdminCredentials()
+      : null;
+    if (cfg && cfg.user) {
+      list.push(cfg.user.toLowerCase());
+    }
+    return list;
+  }
 
   function getCognitoPool() {
     if (typeof AmazonCognitoIdentity === 'undefined') {
@@ -102,7 +109,12 @@ const CognitoAuth = (function() {
     isSuperAdmin: function(emailOrUser) {
       if (!emailOrUser) return false;
       const term = String(emailOrUser).trim().toLowerCase();
-      return SUPER_ADMINS.includes(term);
+      const superList = getSuperAdmins();
+      if (superList.includes(term)) return true;
+      if (typeof window !== 'undefined' && window.UserDB && typeof window.UserDB.isSuperAdmin === 'function') {
+        return window.UserDB.isSuperAdmin(term);
+      }
+      return false;
     },
 
     /**
@@ -118,7 +130,8 @@ const CognitoAuth = (function() {
           return reject(new Error('Todos os campos obrigatórios devem ser preenchidos.'));
         }
 
-        const isSuper = SUPER_ADMINS.includes(cleanEmail);
+        const superList = getSuperAdmins();
+        const isSuper = superList.includes(cleanEmail);
         const userPool = getCognitoPool();
 
         // Se Cognito não estiver configurado com credenciais reais da AWS, utiliza banco local seguro
@@ -206,17 +219,15 @@ const CognitoAuth = (function() {
 
         const cfg = typeof window !== 'undefined' && window.AppConfig && typeof window.AppConfig.getAdminCredentials === 'function'
           ? window.AppConfig.getAdminCredentials()
-          : { user: '', pass: '' };
-
-        const isSuperMaster = SUPER_ADMINS.includes(rawUser);
+          : { user: '', pass: '', name: '' };
 
         // Se uma senha de build foi injetada no AWS Amplify e confere com a digitada
-        if (isSuperMaster && cfg.pass && rawPass === cfg.pass) {
-          const adminEmail = 'maxwellferreira@proton.me';
-          const adminName = 'Maxwell Rodrigues Ferreira';
+        if (cfg.user && rawUser === cfg.user.toLowerCase() && cfg.pass && rawPass === cfg.pass) {
+          const adminEmail = cfg.user;
+          const adminName = cfg.name || 'Administrador Master';
           return resolve({
             user: {
-              uid: 'admin-maxwell-001',
+              uid: 'admin-master-001',
               email: adminEmail,
               name: adminName,
               drogaria: 'Drogasil Mogilar',

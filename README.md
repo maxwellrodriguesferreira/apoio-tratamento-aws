@@ -6,12 +6,15 @@ Aplicação web estática com interface retrô de terminal CRT para redação hu
 
 - **Repositório GitHub:** [`maxwellrodriguesferreira/apoio-tratamento-aws`](https://github.com/maxwellrodriguesferreira/apoio-tratamento-aws)
 - **Hospedagem & CI/CD:** **AWS Amplify Hosting**
-- **Modelo de IA Generativa:** Google **Gemini Flash**
+- **Modelo de IA Generativa:** Google **Gemini Flash** (`gemini-3.8-flash` / `gemini-2.0-flash` / `gemini-1.5-flash`)
+- **Autenticação:** **AWS Cognito User Pools** com fallback criptográfico PBKDF2 / SHA-256
 - **Autor & Responsável Técnico:** Maxwell Rodrigues Ferreira · Farmacêutico CRF-SP nº 86426 & Desenvolvedor Web
 
 > [!IMPORTANT]
 > **Aviso Legal / Isenção de Responsabilidade:**
 > Esta é uma ferramenta **pessoal, independente e de estudo/apoio profissional criada pelo farmacêutico e desenvolvedor Maxwell Rodrigues Ferreira (CRF-SP nº 86426)**. **NÃO foi desenvolvida por, para ou a pedido da empresa RaiaDrogasil (Drogasil)**, não constituindo produto, canal ou sistema oficial da referida empresa. A revisão, validação técnica e orientação farmacêutica final permanecem sob exclusiva responsabilidade do profissional habilitado.
+> 
+> **Zero Persistência de Dados de Clientes:** Em estrito cumprimento à LGPD (Lei Geral de Proteção de Dados) e às boas práticas de segurança em saúde, **nenhum dado sensível de clientes/pacientes (nomes, contatos, medicamentos ou sintomas) é salvo em banco de dados externo ou compartilhado**.
 
 ---
 
@@ -32,7 +35,7 @@ Aplicação web estática com interface retrô de terminal CRT para redação hu
   - 🦠 Teste rápido de COVID-19 (isolamento e evolução respiratória).
   - 🫁 Teste de Painel Respiratório (vírus respiratórios e alívio de tosse/febre).
   - ⚖️ Avaliação de Bioimpedância (leitura do relatório de massa magra/gordura e metas).
-- **Ações Imediatas**: Cópia de texto com formatação para WhatsApp com 1 clique e botão para abertura direta via link wa.me/api.
+- **Ações Imediatas**: Cópia de texto com formatação para WhatsApp com 1 clique e botão para abertura direta via link `wa.me/api`.
 
 ---
 
@@ -54,161 +57,129 @@ Aplicação web estática com interface retrô de terminal CRT para redação hu
 
 ---
 
-### 👥 3. Controle de Acesso Baseado em Funções (RBAC) & Moderação
-- **Aba de Cadastro de Novos Usuários**: Formulário guiado com nome completo, filial/drogaria de atuação, e-mail e senha.
-- **Fluxo de Aprovação Obrigatória**:
-  - Todo novo cadastro recebe status inicial **`Pendente`** (`pending`) e função **`user`**.
-  - O acesso é bloqueado até a aprovação formal por um **Administrador**.
+### 👥 3. Autenticação, Gestão de Credenciais & Moderação
+- **Módulo de Autenticação Híbrido (`CognitoAuth` / `UserDB`)**:
+  - Integração com **AWS Cognito User Pools** (SDK `amazon-cognito-identity-js`) com fallback seguro para banco local criptografado com **PBKDF2 / SHA-256** (100.000 iterações e salt aleatório).
+- **Recuperação Segura de Senha ("Esqueci a Senha")**:
+  - Fluxo em duas etapas com código de verificação de 6 dígitos enviado por e-mail com validade de 15 minutos.
+  - Sem exibição do código na interface gráfica para proteção absoluta.
+- **Modal "👤 Meu Perfil / Redefinir Credenciais"**:
+  - Permite aos farmacêuticos e administradores alterar a senha atual e atualizar dados cadastrais (nome e filial) a qualquer momento.
 - **Painel Administrativo (`👥 Painel Admin` / `/admin/users`)**:
   - **Métricas em Tempo Real**: Contadores de usuários *Pendentes*, *Aprovados*, *Rejeitados*, *Bloqueados* e *Total*.
-  - **Busca Instantânea & Filtros por Aba**: Filtragem ágil por nome, e-mail ou filial.
   - **Moderação Completa com 1 Clique**:
     - `✅ Aprovar`: Libera o acesso imediato ao sistema.
-    - `❌ Rejeitar`: Recusa o cadastro com modal interativo para registro de justificativa.
+    - `❌ Rejeitar`: Recusa o cadastro com registro de justificativa.
     - `⛔ Bloquear / 🔓 Desbloquear`: Suspende ou restabelece acessos previamente autorizados.
     - `⭐ Alternar Role`: Altera permissões entre Usuário Comum (`user`) e Administrador (`admin`).
-    - `✏️ Editar`: Ajusta dados cadastrais (nome e drogaria).
-    - `🗑️ Excluir`: Remove registros do sistema com segurança.
-  - **Trilha de Auditoria Detalhada**: Modal com carimbos de data/hora, administradores responsáveis (`approvedBy`, `rejectedBy`, `blockedBy`) e histórico de decisões.
+    - `✏️ Editar` / `🗑️ Excluir`: Gerenciamento seguro de cadastros.
+  - **Trilha de Auditoria**: Carimbos ISO e histórico de todas as ações de moderação.
 
 ---
 
-### 🔄 4. Sincronização Dinâmica da Sessão
-- **Barra de Status Inferior**: Exibe a drogaria ativa (`🏬 Drogaria`) e o profissional conectado (`👨‍⚕️ Usuário`).
-- **Prompt CLI & Título do Terminal**: Formatação no estilo `<usuario>@<drogaria-slug>:~$` na janela e no console.
-- **Assinaturas Automáticas**: Injeção dinâmica do nome do profissional e filial nas mensagens geradas e nos prompts enviados ao Gemini.
+## 🌐 Como Configurar Domínio Personalizado da Hostinger no AWS Amplify
+
+Para utilizar seu domínio próprio registrado na **Hostinger** (ex: `meudominio.com.br` ou `apoio.meudominio.com.br`) na sua aplicação hospedada no **AWS Amplify**, siga os passos abaixo:
+
+### Passo 1: Iniciar a configuração no AWS Amplify
+1. Acesse o **[Console AWS Amplify](https://console.aws.amazon.com/amplify/)**.
+2. Selecione seu aplicativo (`apoio-tratamento-aws`).
+3. No menu lateral esquerdo, clique em **Hosting** > **Custom domains** (Domínios personalizados).
+4. Clique no botão **Add domain** (Adicionar domínio).
+5. Digite o seu domínio adquirido na Hostinger (ex: `meudominio.com.br`) e clique em **Configure domain**.
+6. Configure os apontamentos de branch:
+   - Apontar `meudominio.com.br` para o branch `main`.
+   - Apontar `www.meudominio.com.br` (ou subdomínio) para o branch `main`.
+7. Clique em **Save** (Salvar).
+
+### Passo 2: Copiar os registros DNS fornecidos pela AWS
+O AWS Amplify gerará automaticamente:
+1. **Registro CNAME de Verificação SSL (Certificado Gratuito ACM):**
+   - **Nome / Host:** `_xxxxxxxx.meudominio.com.br`
+   - **Tipo:** `CNAME`
+   - **Valor / Aponta para:** `_yyyyyyyy.acm-validations.aws.`
+2. **Registros de Apontamento do Site:**
+   - **Para subdomínio (ex: `www` ou `app`):** Registro `CNAME` apontando para o endereço CloudFront do Amplify (ex: `dxxxxxxxx.cloudfront.net`).
+   - **Para o domínio raiz (`@`):** Registros `ANAME` / `ALIAS` ou `CNAME` conforme a Hostinger disponibilizar.
+
+### Passo 3: Inserir os registros no Painel DNS da Hostinger
+1. Acesse o **[Painel da Hostinger (hPanel)](https://hpanel.hostinger.com/)**.
+2. Vá em **Domínios** > Selecione o seu domínio > Clique em **DNS / Servidores de Nomes**.
+3. Na seção **Gerenciar registros DNS**, adicione:
+   - **Validação SSL:**
+     - **Tipo:** `CNAME`
+     - **Nome:** O prefixo gerado pela AWS (sem o nome do domínio no final)
+     - **Alvo / Aponta para:** O valor do ACM fornecido pela AWS
+     - **TTL:** `300` ou `Padrão`
+   - **Apontamento do Aplicativo (Subdomínio www ou app):**
+     - **Tipo:** `CNAME`
+     - **Nome:** `www` (ou o subdomínio desejado)
+     - **Alvo:** `dxxxxxxxx.cloudfront.net` (URL do CloudFront fornecida pelo Amplify)
+     - **TTL:** `300` ou `Padrão`
+4. Clique em **Adicionar Registro**.
+
+> [!NOTE]
+> A propagação de DNS costuma levar de 15 minutos a poucas horas. Assim que os registros forem validados, o AWS Amplify emitirá o certificado SSL HTTPS gratuitamente e o seu domínio ficará 100% ativo e seguro!
 
 ---
 
-### 🛡️ 5. Segurança & Cabeçalhos HTTP (`customHttp.yml`)
-- **Headers HTTP Seguros no AWS Amplify**: Configuração de `X-Content-Type-Options: nosniff`, `X-Frame-Options: SAMEORIGIN`, `X-XSS-Protection: 1; mode=block` e `Referrer-Policy: strict-origin-when-cross-origin`.
-- **Permissions-Policy Restritiva**: Bloqueio de acesso a microfone, câmera e geolocalização.
-- **Imutabilidade e Integridade Local**: Validação de integridade de sessões locais e controle de super-usuário.
+## ⌨️ Comandos do Terminal CLI
 
----
-
-## 🧠 Integração com Google Gemini Flash
-
-O sistema integra a inteligência artificial generativa **Google Gemini Flash** para criar mensagens personalizadas e clinicamente adaptadas:
-
-- **Módulo de Configuração Central ([`app-config.js`](file:///home/maxwell/terminal/app-config.js)):**
-  - Gerencia a chave da API do Gemini (`AppConfig.getGeminiApiKey()` e `AppConfig.setGeminiApiKey()`).
-  - Suporta injeção de chave via variável de ambiente `GEMINI_API_KEY` durante o build no AWS Amplify.
-- **Fallback Automático:** Quando a chave não está configurada ou a IA está temporariamente indisponível, o motor local anti-spam assume a geração de forma instantânea e sem interrupção.
-- **Configuração da Chave:**
-  - Abra o modal clicando em **⚙️ Configurações** ou digite `ia` / `apikey [chave]` no terminal.
-  - As chaves podem ser obtidas gratuitamente no [Google AI Studio](https://aistudio.google.com/apikey).
-
----
-
-## 💻 Tabela Completa de Comandos da CLI
-
-| Comando | Descrição / Ação | Exemplo Prático |
+| Comando | Descrição | Exemplo de Uso |
 | :--- | :--- | :--- |
-| `novo`, `guiado`, `criar` | Abre o formulário guiado de criação individual. | `novo` |
-| `gerar [nome] [item]` | Gera mensagens diretamente a partir dos parâmetros informados. | `gerar "Carlos" "Amoxicilina 500mg"` |
-| `gerar --nome ... --medicamento ...` | Gera mensagens utilizando flags nomeadas. | `gerar --nome Ana --medicamento "Pressão Arterial"` |
-| `lote`, `batch`, `massa` | Abre o assistente de processamento e disparo de mensagens em lote. | `lote` |
-| `servicos`, `servico` | Lista os 8 serviços farmacêuticos clínicos suportados pelo motor. | `servicos` |
-| `sobre`, `info`, `autor`, `creditos` | Exibe dados do projeto, idealizador e farmacêutico responsável. | `sobre` |
-| `historico` | Exibe o histórico de mensagens geradas na sessão. | `historico` |
-| `historico limpar`, `zerar` | Limpa o histórico de mensagens e reinicia o contador diário. | `zerar` |
-| `exemplos`, `exemplo` | Gera 3 casos clínicos demonstrativos (medicamentos e serviços). | `exemplos` |
-| `ia`, `gemini`, `config` | Abre o painel de configurações do Google Gemini. | `ia` |
-| `ia status` / `ia remover` | Consulta o status de conexão da IA ou remove a chave salva. | `ia status` |
+| `novo` / `gerar` | Inicia o assistente interativo para redação de mensagem. | `novo` |
+| `lote` / `batch` | Abre o painel de processamento em lote para WhatsApp. | `lote` |
+| `perfil` / `conta` | Abre o modal Meu Perfil para alteração cadastral e de senha. | `perfil` |
+| `senha` / `redefinir`| Abre diretamente a aba de alteração de senha. | `senha` |
+| `ia` / `config` | Abre o painel de configurações da chave Gemini. | `ia` |
 | `apikey [chave]` | Salva a chave de API do Gemini diretamente pelo terminal. | `apikey AIzaSy...` |
-| `tema [matrix\|amber\|cyberpunk\|dark]` | Alterna ou define o esquema de cores e estilo visual do CRT. | `tema amber` |
-| `crt`, `scanlines` | Ativa ou desativa o efeito de scanlines do monitor CRT. | `crt` |
-| `limpar`, `clear`, `cls` | Limpa a tela do terminal CRT. | `limpar` |
-| `usuario`, `whoami`, `perfil` | Exibe os dados do usuário autenticado e permissões ativas. | `whoami` |
-| `senha [nova_senha]` | Altera a senha do usuário local. | `senha 123456` |
-| `sair`, `logout` | Encerra a sessão atual e bloqueia o terminal. | `sair` |
-| `ajuda`, `help`, `?` | Exibe a lista completa de comandos e atalhos disponíveis. | `ajuda` |
-| **Comandos Administrativos (Super Usuário)** | | |
-| `usuarios`, `admin`, `users` | Abre o painel administrativo de aprovação e gestão de farmacêuticos. | `usuarios` |
-| `aprovar [email\|nome]` | Aprova diretamente o cadastro de um farmacêutico pelo CLI. | `aprovar camila@drogasil.com.br` |
-| `rejeitar [email] [motivo]` | Rejeita o cadastro de um usuário informando a justificativa. | `rejeitar joao@email.com Cadastro incompleto` |
-| `bloquear [email\|nome]` | Suspende temporariamente o acesso de um usuário. | `bloquear joao@email.com` |
-| `desbloquear [email\|nome]` | Reativa o acesso de uma conta previamente suspensa. | `desbloquear joao@email.com` |
-| `role [email] [user\|admin]` | Altera a permissão entre usuário comum e administrador. | `role camila@drogasil.com.br admin` |
-| `deletar [email\|nome]` | Exclui permanentemente um registro de usuário do sistema. | `deletar teste@email.com` |
+| `historico` | Exibe o histórico de mensagens geradas na sessão. | `historico` |
+| `limpar` | Limpa o buffer de saída do terminal. | `limpar` |
+| `tema [matrix\|amber\|cyberpunk\|dark]` | Alterna o esquema de cores retrô do terminal. | `tema amber` |
+| `crt` | Liga ou desliga o efeito visual de tubo CRT (scanlines). | `crt` |
+| `usuarios` / `admin` | Abre o Painel Administrativo de Gestão de Usuários (Requer Admin). | `usuarios` |
+| `aprovar [email]` | Aprova diretamente o cadastro de um farmacêutico pelo CLI. | `aprovar camila@drogaria.com.br` |
+| `rejeitar [email] [motivo]` | Rejeita o cadastro de um usuário informando justificativa. | `rejeitar joao@drogaria.com.br Incompleto` |
+| `bloquear [email]` | Suspende o acesso de um usuário. | `bloquear joao@drogaria.com.br` |
+| `desbloquear [email]` | Reativa o acesso de uma conta suspensa. | `desbloquear joao@drogaria.com.br` |
+| `role [email] [user\|admin]` | Altera a permissão entre usuário e administrador. | `role camila@drogaria.com.br admin` |
+| `deletar [email]` | Exclui permanentemente um registro de usuário do sistema. | `deletar teste@drogaria.com.br` |
+| `sair` / `logout` | Encerra a sessão ativa com segurança. | `sair` |
 
 ---
 
-## 🔒 Privacidade & Proteção de Dados (LGPD)
+## 🛠️ Variáveis de Ambiente no AWS Amplify
 
-- **Configuração Exclusiva da API:** Apenas a chave de API do Gemini da aplicação é gerenciada.
-- **Zero Dados de Clientes no Banco:** Nomes, telefones, medicamentos, posologias ou mensagens geradas **NUNCA** são gravados em bancos de dados na nuvem ou externos.
-- **Processamento Volátil em Tempo Real:** O processamento com IA utiliza apenas os parâmetros em tempo de execução para redação da mensagem.
+No console do AWS Amplify (**App Settings** > **Environment variables**):
 
----
-
-## 📂 Arquitetura do Projeto
-
-A aplicação é 100% estática, construída com JavaScript modular moderno (ES6+), CSS com variáveis e hospedada na AWS Amplify:
-
-| Arquivo | Descrição e Responsabilidade |
-| :--- | :--- |
-| [`index.html`](file:///home/maxwell/terminal/index.html) | Estrutura semântica da aplicação, tela CRT, modais, formulários de autenticação/cadastro e painel administrativo. |
-| [`style.css`](file:///home/maxwell/terminal/style.css) | Design system CRT, scanlines, 4 temas visuais, badges de status, fila de envio em lote e responsividade mobile. |
-| [`app.js`](file:///home/maxwell/terminal/app.js) | Núcleo da CLI, motor de geração de mensagens, fila de disparos para WhatsApp, moderação RBAC e integração Gemini. |
-| [`cognito-auth.js`](file:///home/maxwell/terminal/cognito-auth.js) | Integração de autenticação com AWS Cognito User Pool (SDK Amazon Cognito Identity). |
-| [`user-db.js`](file:///home/maxwell/terminal/user-db.js) | Banco de dados seguro de usuários locais com criptografia PBKDF2/SHA-256 e auditoria. |
-| [`app-config.js`](file:///home/maxwell/terminal/app-config.js) | Configuração central da aplicação, gestão da chave Gemini e parâmetros do AWS Cognito. |
-| [`amplify.yml`](file:///home/maxwell/terminal/amplify.yml) | Especificação de build e deploy contínuo do AWS Amplify Hosting com injeção de variáveis de ambiente. |
-| [`customHttp.yml`](file:///home/maxwell/terminal/customHttp.yml) | Cabeçalhos de segurança HTTP (Cache-Control, X-Frame-Options, X-Content-Type-Options, etc.). |
-| [`test.js`](file:///home/maxwell/terminal/test.js) | Suíte completa de testes automatizados (parsers de IA, validações RBAC, URLs de WhatsApp e integridade). |
+| Variável | Descrição | Exemplo |
+| :--- | :--- | :--- |
+| `GEMINI_API_KEY` | Chave da API do Google Gemini obtida no Google AI Studio | `AIzaSy...` |
+| `COGNITO_REGION` | Região do seu AWS Cognito User Pool | `us-east-1` ou `sa-east-1` |
+| `COGNITO_USER_POOL_ID` | ID do seu User Pool no AWS Cognito | `us-east-1_xxxxxxxxx` |
+| `COGNITO_CLIENT_ID` | ID do App Client (sem client secret) do Cognito | `7abcdef1234567890abcdef` |
+| `ADMIN_USER` | E-mail do Administrador Master configurável no build | `admin@suadrogaria.com.br` |
+| `ADMIN_PASSWORD` | Senha inicial de build do Administrador Master | `SuaSenhaSegura123!` |
 
 ---
 
-## 🧪 Execução e Validação Local
+## 🧪 Validação e Testes Automatizados
 
-Para executar a aplicação localmente:
+Para rodar os testes e verificar a integridade da aplicação:
 
 ```bash
-# Iniciar servidor estático local na porta 8080
-cd /home/maxwell/terminal
-python3 -m http.server 8080
-```
-
-Acesse [http://localhost:8080](http://localhost:8080) no navegador.
-
-Para executar a suíte automatizada de validação:
-
-```bash
+# Validação de sintaxe
 node --check app-config.js
-node --check user-db.js
 node --check cognito-auth.js
+node --check user-db.js
 node --check app.js
+
+# Execução da suíte de testes de integração, segurança e IA
 node test.js
 ```
 
 ---
 
-## 🚀 Publicação e Deploy (AWS Amplify & AWS Cognito)
+## 📄 Licença & Propriedade Intelectual
 
-Cada alteração enviada para a branch `main` é automaticamente construída e publicada pelo AWS Amplify Hosting:
-
-```bash
-git add .
-git commit -m "feat: sua alteracao em portugues"
-git push
-```
-
-### Configuração de Variáveis de Ambiente no AWS Amplify Console
-No console do **AWS Amplify**, acesse **App settings > Environment variables** e configure:
-
-| Variável | Descrição | Exemplo |
-| :--- | :--- | :--- |
-| `GEMINI_API_KEY` | Chave da API do Google Gemini Flash obtida no Google AI Studio | `AIzaSy...` |
-| `COGNITO_REGION` | Região do seu AWS Cognito User Pool | `us-east-1` ou `sa-east-1` |
-| `COGNITO_USER_POOL_ID` | ID do seu User Pool no AWS Cognito | `us-east-1_xxxxxxxxx` |
-| `COGNITO_CLIENT_ID` | ID do App Client (sem client secret) do Cognito | `7abcdef1234567890abcdef` |
-| `ADMIN_USER` | E-mail do Administrador mestre da aplicação | `maxwellferreira@proton.me` |
-| `ADMIN_PASSWORD` | Senha inicial do Administrador mestre | `SuaSenhaSegura123` |
-
----
-
-## 📌 Versão
-
-**4.0.0-AWS** — Migração para AWS Amplify Hosting e AWS Cognito, centralização da configuração do Google Gemini via `app-config.js` com suporte a variáveis de ambiente da AWS, eliminação de dependências do Firebase e garantia de 0 persistência de dados de clientes em banco de dados.
+Desenvolvido por **Maxwell Rodrigues Ferreira** · Farmacêutico inscrito no **CRF-SP sob o nº 86426**. Todos os direitos reservados.
