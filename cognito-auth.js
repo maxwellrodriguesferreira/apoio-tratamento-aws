@@ -2,10 +2,12 @@
  * Terminal Apoio ao Tratamento - Drogasil Mogilar
  * Módulo de Autenticação AWS Cognito & Controle de Acesso Baseado em Funções (RBAC)
  *
- * SERVIÇOS AWS:
+ * SERVIÇOS AWS & ARQUITETURA DE SEGURANÇA:
  * - Amazon Cognito User Pools (amazon-cognito-identity-js)
- * - Fluxo de Aprovação Obrigatória por Administrador
- * - PRIVACIDADE: 0 dados de clientes salvos em banco.
+ * - Criptografia Forte PBKDF2 / SHA-256 com Salt dinâmico
+ * - Gestão de Credenciais: Login, Cadastro, Recuperação por Código e Alteração de Senha
+ * - Fluxo de Moderação & Aprovação Obrigatória por Administrador
+ * - PRIVACIDADE TOTAL: 0 dados de clientes/pacientes salvos em banco de dados.
  */
 
 const CognitoAuth = (function() {
@@ -22,7 +24,7 @@ const CognitoAuth = (function() {
       ? window.AppConfig.getCognitoConfig()
       : null;
 
-    if (!cfg || !cfg.userPoolId || !cfg.clientId || cfg.userPoolId.includes('PLACEHOLDER')) {
+    if (!cfg || !cfg.userPoolId || !cfg.clientId || cfg.userPoolId.includes('PLACEHOLDER') || cfg.clientId.includes('PLACEHOLDER')) {
       return null;
     }
 
@@ -54,6 +56,44 @@ const CognitoAuth = (function() {
     return 'user';
   }
 
+  function translateCognitoError(err, cleanEmail = '') {
+    if (!err) return 'Ocorreu um erro inesperado durante a autenticação.';
+    const code = err.code || err.name || '';
+    const message = err.message || '';
+
+    switch (code) {
+      case 'UserNotFoundException':
+        return cleanEmail 
+          ? `O e-mail "${cleanEmail}" ainda não possui cadastro no sistema. Clique na aba "📝 Solicitar Cadastro" para criar sua conta.`
+          : 'Usuário não encontrado. Verifique seu e-mail ou solicite cadastro.';
+      case 'NotAuthorizedException':
+        return 'E-mail ou senha incorretos.';
+      case 'UserNotConfirmedException':
+        return 'Cadastro ainda não confirmado. Verifique o link de ativação enviado para seu e-mail.';
+      case 'CodeMismatchException':
+        return 'Código de verificação incorreto ou inválido.';
+      case 'ExpiredCodeException':
+        return 'O código de verificação expirou. Solicite um novo código.';
+      case 'InvalidPasswordException':
+        return 'A senha deve conter no mínimo 6 caracteres.';
+      case 'LimitExceededException':
+        return 'Limite de tentativas excedido para este e-mail. Por favor, aguarde alguns minutos antes de tentar novamente.';
+      case 'UsernameExistsException':
+        return `O e-mail "${cleanEmail || 'informado'}" já está cadastrado no sistema.`;
+      case 'InvalidParameterException':
+        return 'Parâmetros inválidos. Por favor, confira os dados informados.';
+      case 'ResourceNotFoundException':
+        return 'Recurso de autenticação não encontrado na AWS. Utilizando banco seguro local.';
+      default:
+        if (message.includes('Username/client id combination not found') || message.includes('not found')) {
+          return cleanEmail 
+            ? `O e-mail "${cleanEmail}" ainda não possui cadastro no sistema. Clique na aba "📝 Solicitar Cadastro" para criar sua conta.`
+            : 'Usuário ou credencial não encontrada no sistema.';
+        }
+        return message || 'Falha na operação de autenticação.';
+    }
+  }
+
   return {
     isConfigured: function() {
       return isCognitoAvailable();
@@ -66,7 +106,7 @@ const CognitoAuth = (function() {
     },
 
     /**
-     * Cadastro de novo farmacêutico/usuário no AWS Cognito
+     * Cadastro de novo farmacêutico/usuário (AWS Cognito / Banco Seguro Local)
      */
     signUp: function(name, email, drogaria, password) {
       return new Promise((resolve, reject) => {
@@ -105,51 +145,55 @@ const CognitoAuth = (function() {
           new AmazonCognitoIdentity.CognitoUserAttribute({ Name: 'custom:role', Value: isSuper ? 'admin' : 'user' })
         ];
 
-        userPool.signUp(cleanEmail, password, attributeList, null, (err, result) => {
-          if (err) {
-            let msg = err.message || 'Falha ao cadastrar usuário no AWS Cognito.';
-            if (err.code === 'UsernameExistsException') {
-              msg = `O e-mail "${cleanEmail}" já possui cadastro no AWS Cognito.`;
-            } else if (err.code === 'InvalidPasswordException') {
-              msg = 'A senha deve conter no mínimo 8 caracteres, letras maiúsculas, minúsculas e números.';
+        try {
+          userPool.signUp(cleanEmail, password, attributeList, null, (err, result) => {
+            if (err) {
+              const friendlyMsg = translateCognitoError(err, cleanEmail);
+              const error = new Error(friendlyMsg);
+              error.code = err.code;
+              return reject(error);
             }
-            const error = new Error(msg);
-            error.code = err.code;
-            return reject(error);
-          }
 
-          const cognitoUser = result.user;
-          const userRecord = {
-            uid: cognitoUser.getUsername() || cleanEmail,
-            name: cleanName,
-            email: cleanEmail,
-            drogaria: cleanDrogaria,
-            role: isSuper ? 'admin' : 'user',
-            status: isSuper ? 'approved' : 'pending',
-            provider: 'aws-cognito',
-            createdAt: new Date().toISOString()
-          };
+            const cognitoUser = result.user;
+            const userRecord = {
+              uid: cognitoUser.getUsername() || cleanEmail,
+              name: cleanName,
+              email: cleanEmail,
+              drogaria: cleanDrogaria,
+              role: isSuper ? 'admin' : 'user',
+              status: isSuper ? 'approved' : 'pending',
+              provider: 'aws-cognito',
+              createdAt: new Date().toISOString()
+            };
 
-          // Salva no registro local para redundância rápida
-          if (typeof window !== 'undefined' && window.UserDB && typeof window.UserDB.getAllUsers === 'function') {
-            try {
-              const users = window.UserDB.getAllUsers();
-              if (!users.some(u => u.email === cleanEmail)) {
-                users.push(userRecord);
-                if (typeof localStorage !== 'undefined') {
-                  localStorage.setItem('apoio_users_registry', JSON.stringify(users));
+            // Salva no registro local para redundância rápida
+            if (typeof window !== 'undefined' && window.UserDB && typeof window.UserDB.getAllUsers === 'function') {
+              try {
+                const users = window.UserDB.getAllUsers();
+                if (!users.some(u => u.email === cleanEmail)) {
+                  users.push(userRecord);
+                  if (typeof localStorage !== 'undefined') {
+                    localStorage.setItem('apoio_users_registry', JSON.stringify(users));
+                  }
                 }
-              }
-            } catch (e) {}
-          }
+              } catch (e) {}
+            }
 
-          resolve(userRecord);
-        });
+            resolve(userRecord);
+          });
+        } catch (e) {
+          if (typeof window !== 'undefined' && window.UserDB && typeof window.UserDB.registerUser === 'function') {
+            return window.UserDB.registerUser(cleanName, cleanEmail, cleanDrogaria, password)
+              .then(resolve)
+              .catch(reject);
+          }
+          reject(e);
+        }
       });
     },
 
     /**
-     * Autenticação via AWS Cognito (com validação de aprovação por Admin)
+     * Autenticação via AWS Cognito / Banco Seguro Local (com validação de aprovação por Admin)
      */
     signIn: function(emailOrUser, password) {
       return new Promise((resolve, reject) => {
@@ -160,12 +204,11 @@ const CognitoAuth = (function() {
           return reject(new Error('Preencha o e-mail/usuário e a senha.'));
         }
 
-        // Suporte a Administrador Mestre exclusivo (maxwellferreira@proton.me)
         const cfg = typeof window !== 'undefined' && window.AppConfig && typeof window.AppConfig.getAdminCredentials === 'function'
           ? window.AppConfig.getAdminCredentials()
-          : { user: 'maxwellferreira@proton.me', pass: '', name: 'Maxwell Rodrigues Ferreira' };
+          : { user: '', pass: '' };
 
-        const isSuperMaster = SUPER_ADMINS.includes(rawUser) || rawUser === String(cfg.user || '').toLowerCase();
+        const isSuperMaster = SUPER_ADMINS.includes(rawUser);
 
         // Se uma senha de build foi injetada no AWS Amplify e confere com a digitada
         if (isSuperMaster && cfg.pass && rawPass === cfg.pass) {
@@ -197,99 +240,113 @@ const CognitoAuth = (function() {
           return reject(new Error('Módulo de autenticação não inicializado.'));
         }
 
-        const authenticationDetails = new AmazonCognitoIdentity.AuthenticationDetails({
-          Username: rawUser,
-          Password: rawPass
-        });
+        try {
+          const authenticationDetails = new AmazonCognitoIdentity.AuthenticationDetails({
+            Username: rawUser,
+            Password: rawPass
+          });
 
-        const userData = {
-          Username: rawUser,
-          Pool: userPool
-        };
+          const userData = {
+            Username: rawUser,
+            Pool: userPool
+          };
 
-        const cognitoUser = new AmazonCognitoIdentity.CognitoUser(userData);
+          const cognitoUser = new AmazonCognitoIdentity.CognitoUser(userData);
 
-        cognitoUser.authenticateUser(authenticationDetails, {
-          onSuccess: function(result) {
-            cognitoUser.getUserAttributes((err, attributes) => {
-              const attrs = {};
-              if (!err && Array.isArray(attributes)) {
-                attributes.forEach(attr => {
-                  attrs[attr.getName()] = attr.getValue();
-                });
-              }
-
-              const isSuper = SUPER_ADMINS.includes(rawUser) || attrs['custom:role'] === 'admin';
-              const rawStatus = attrs['custom:status'] || (isSuper ? 'approved' : 'pending');
-              const currentStatus = normalizeStatus(rawStatus);
-
-              const userProfile = {
-                uid: cognitoUser.getUsername() || rawUser,
-                email: attrs['email'] || rawUser,
-                name: attrs['name'] || rawUser.split('@')[0],
-                drogaria: attrs['custom:drogaria'] || 'Drogasil Mogilar',
-                role: isSuper ? 'admin' : normalizeRole(attrs['custom:role'] || 'user'),
-                status: currentStatus,
-                provider: 'aws-cognito',
-                idToken: result.getIdToken().getJwtToken(),
-                accessToken: result.getAccessToken().getJwtToken()
-              };
-
-              // Validação rígida de status de aprovação
-              if (!isSuper && currentStatus !== 'approved') {
-                cognitoUser.signOut();
-                if (currentStatus === 'rejected') {
-                  const err = new Error('Acesso Rejeitado: Seu cadastro foi recusado pela administração.');
-                  err.code = 'REJECTED';
-                  return reject(err);
-                } else if (currentStatus === 'blocked') {
-                  const err = new Error('Conta Bloqueada: Seu acesso foi suspenso pelo Administrador.');
-                  err.code = 'BLOCKED';
-                  return reject(err);
-                } else {
-                  const err = new Error('Acesso Bloqueado: Seu cadastro está aguardando APROVAÇÃO de um Administrador.');
-                  err.code = 'PENDING_APPROVAL';
-                  return reject(err);
+          cognitoUser.authenticateUser(authenticationDetails, {
+            onSuccess: function(result) {
+              cognitoUser.getUserAttributes((err, attributes) => {
+                const attrs = {};
+                if (!err && Array.isArray(attributes)) {
+                  attributes.forEach(attr => {
+                    attrs[attr.getName()] = attr.getValue();
+                  });
                 }
+
+                const isSuper = SUPER_ADMINS.includes(rawUser) || attrs['custom:role'] === 'admin';
+                const rawStatus = attrs['custom:status'] || (isSuper ? 'approved' : 'pending');
+                const currentStatus = normalizeStatus(rawStatus);
+
+                const userProfile = {
+                  uid: cognitoUser.getUsername() || rawUser,
+                  email: attrs['email'] || rawUser,
+                  name: attrs['name'] || rawUser.split('@')[0],
+                  drogaria: attrs['custom:drogaria'] || 'Drogasil Mogilar',
+                  role: isSuper ? 'admin' : normalizeRole(attrs['custom:role'] || 'user'),
+                  status: currentStatus,
+                  provider: 'aws-cognito',
+                  idToken: result.getIdToken().getJwtToken(),
+                  accessToken: result.getAccessToken().getJwtToken()
+                };
+
+                // Validação rígida de status de aprovação
+                if (!isSuper && currentStatus !== 'approved') {
+                  cognitoUser.signOut();
+                  if (currentStatus === 'rejected') {
+                    const err = new Error('Acesso Rejeitado: Seu cadastro foi recusado pela administração.');
+                    err.code = 'REJECTED';
+                    return reject(err);
+                  } else if (currentStatus === 'blocked') {
+                    const err = new Error('Conta Bloqueada: Seu acesso foi suspenso pelo Administrador.');
+                    err.code = 'BLOCKED';
+                    return reject(err);
+                  } else {
+                    const err = new Error('Acesso Bloqueado: Seu cadastro está aguardando APROVAÇÃO de um Administrador.');
+                    err.code = 'PENDING_APPROVAL';
+                    return reject(err);
+                  }
+                }
+
+                resolve({ user: userProfile, status: 'approved' });
+              });
+            },
+
+            onFailure: function(err) {
+              // Tenta fallback para banco local se a falha for de comunicação ou usuário não achado no pool
+              if (typeof window !== 'undefined' && window.UserDB && typeof window.UserDB.authenticateUser === 'function') {
+                return window.UserDB.authenticateUser(rawUser, rawPass)
+                  .then(resolve)
+                  .catch(() => {
+                    const friendlyMsg = translateCognitoError(err, rawUser);
+                    const error = new Error(friendlyMsg);
+                    error.code = err.code;
+                    reject(error);
+                  });
               }
+              const friendlyMsg = translateCognitoError(err, rawUser);
+              const error = new Error(friendlyMsg);
+              error.code = err.code;
+              reject(error);
+            },
 
-              resolve({ user: userProfile, status: 'approved' });
-            });
-          },
-
-          onFailure: function(err) {
-            let msg = err.message || 'Falha ao autenticar no AWS Cognito.';
-            if (err.code === 'NotAuthorizedException') {
-              msg = 'E-mail ou senha incorretos.';
-            } else if (err.code === 'UserNotFoundException') {
-              msg = 'Usuário não encontrado no AWS Cognito.';
-            } else if (err.code === 'UserNotConfirmedException') {
-              msg = 'Cadastro ainda não confirmado por e-mail.';
+            newPasswordRequired: function(userAttributes, requiredAttributes) {
+              const newPassword = prompt('Por favor, defina uma nova senha para sua conta:');
+              if (!newPassword) {
+                return reject(new Error('Alteração de senha obrigatória cancelada.'));
+              }
+              cognitoUser.completeNewPasswordChallenge(newPassword, {}, this);
             }
-            const error = new Error(msg);
-            error.code = err.code;
-            reject(error);
-          },
-
-          newPasswordRequired: function(userAttributes, requiredAttributes) {
-            // Caso seja primeiro login com senha temporária
-            const newPassword = prompt('Por favor, defina uma nova senha para sua conta:');
-            if (!newPassword) {
-              return reject(new Error('Alteração de senha obrigatória cancelada.'));
-            }
-            cognitoUser.completeNewPasswordChallenge(newPassword, {}, this);
+          });
+        } catch (e) {
+          if (typeof window !== 'undefined' && window.UserDB && typeof window.UserDB.authenticateUser === 'function') {
+            return window.UserDB.authenticateUser(rawUser, rawPass)
+              .then(resolve)
+              .catch(reject);
           }
-        });
+          reject(e);
+        }
       });
     },
 
     signOut: function() {
       const userPool = getCognitoPool();
       if (userPool) {
-        const currentUser = userPool.getCurrentUser();
-        if (currentUser) {
-          currentUser.signOut();
-        }
+        try {
+          const currentUser = userPool.getCurrentUser();
+          if (currentUser) {
+            currentUser.signOut();
+          }
+        } catch (e) {}
       }
     },
 
@@ -306,9 +363,7 @@ const CognitoAuth = (function() {
             return window.UserDB.requestPasswordReset(cleanEmail)
               .then(resolve)
               .catch(err => {
-                const msg = err.message && err.message.includes('Nenhum usuário')
-                  ? `O e-mail "${cleanEmail}" ainda não possui cadastro no sistema. Clique na aba "📝 Solicitar Cadastro" para criar sua conta.`
-                  : (err.message || 'Falha ao solicitar recuperação.');
+                const msg = translateCognitoError(err, cleanEmail);
                 reject(new Error(msg));
               });
           }
@@ -332,10 +387,11 @@ const CognitoAuth = (function() {
               resolve({ success: true, message: 'Código de recuperação enviado para seu e-mail cadastrado.', data });
             },
             onFailure: function(err) {
+              // Se falhar no Cognito, aciona o fallback no banco de dados local
               fallbackLocal();
             },
             inputVerificationCode: function(data) {
-              resolve({ success: true, message: 'Código de verificação enviado para seu e-mail.', data, requiresCode: true });
+              resolve({ success: true, message: 'Código de verificação enviado para seu e-mail cadastrado.', data, requiresCode: true });
             }
           });
         } catch (e) {
@@ -361,7 +417,10 @@ const CognitoAuth = (function() {
           if (typeof window !== 'undefined' && window.UserDB && typeof window.UserDB.confirmPasswordReset === 'function') {
             return window.UserDB.confirmPasswordReset(cleanEmail, cleanCode, cleanPass)
               .then(resolve)
-              .catch(reject);
+              .catch(err => {
+                const msg = translateCognitoError(err, cleanEmail);
+                reject(new Error(msg));
+              });
           }
           return reject(new Error('Serviço de recuperação indisponível.'));
         };
@@ -380,11 +439,137 @@ const CognitoAuth = (function() {
 
           cognitoUser.confirmPassword(cleanCode, cleanPass, {
             onSuccess: function() {
+              // Mantém sincronizado no banco local
+              if (typeof window !== 'undefined' && window.UserDB && typeof window.UserDB.confirmPasswordReset === 'function') {
+                window.UserDB.confirmPasswordReset(cleanEmail, cleanCode, cleanPass).catch(() => {});
+              }
               resolve({ success: true, message: 'Sua senha foi redefinida com sucesso! Você já pode entrar no sistema.' });
             },
             onFailure: function(err) {
               fallbackLocal();
             }
+          });
+        } catch (e) {
+          fallbackLocal();
+        }
+      });
+    },
+
+    /**
+     * Alteração de Senha por usuário autenticado (Senha Atual -> Nova Senha)
+     */
+    changePassword: function(userEmail, oldPassword, newPassword) {
+      return new Promise((resolve, reject) => {
+        const cleanEmail = String(userEmail || '').trim().toLowerCase();
+        const cleanOld = String(oldPassword || '');
+        const cleanNew = String(newPassword || '');
+
+        if (!cleanEmail || !cleanOld || !cleanNew) {
+          return reject(new Error('Informe a senha atual e a nova senha.'));
+        }
+        if (cleanNew.length < 6) {
+          return reject(new Error('A nova senha deve ter no mínimo 6 caracteres.'));
+        }
+
+        const fallbackLocal = () => {
+          if (typeof window !== 'undefined' && window.UserDB && typeof window.UserDB.changePassword === 'function') {
+            return window.UserDB.changePassword(cleanEmail, cleanOld, cleanNew)
+              .then(resolve)
+              .catch(reject);
+          }
+          return reject(new Error('Serviço de redefinição indisponível.'));
+        };
+
+        const userPool = getCognitoPool();
+        if (!userPool) {
+          return fallbackLocal();
+        }
+
+        try {
+          const userData = {
+            Username: cleanEmail,
+            Pool: userPool
+          };
+          const cognitoUser = new AmazonCognitoIdentity.CognitoUser(userData);
+
+          // Tenta autenticar primeiro para validar a senha atual no Cognito
+          const authDetails = new AmazonCognitoIdentity.AuthenticationDetails({
+            Username: cleanEmail,
+            Password: cleanOld
+          });
+
+          cognitoUser.authenticateUser(authDetails, {
+            onSuccess: function() {
+              cognitoUser.changePassword(cleanOld, cleanNew, (err, result) => {
+                if (err) {
+                  const friendlyMsg = translateCognitoError(err, cleanEmail);
+                  return reject(new Error(friendlyMsg));
+                }
+                // Sincroniza no banco local
+                if (typeof window !== 'undefined' && window.UserDB && typeof window.UserDB.changePassword === 'function') {
+                  window.UserDB.changePassword(cleanEmail, cleanOld, cleanNew).catch(() => {});
+                }
+                resolve({ success: true, message: 'Senha alterada com sucesso no AWS Cognito e no sistema!' });
+              });
+            },
+            onFailure: function() {
+              // Se não autenticou no Cognito, tenta validar no banco local
+              fallbackLocal();
+            }
+          });
+        } catch (e) {
+          fallbackLocal();
+        }
+      });
+    },
+
+    /**
+     * Atualização do Perfil do Farmacêutico (Nome e Drogaria/Unidade)
+     */
+    updateProfile: function(userEmail, updateData) {
+      return new Promise((resolve, reject) => {
+        const cleanEmail = String(userEmail || '').trim().toLowerCase();
+        if (!cleanEmail) return reject(new Error('E-mail do usuário não identificado.'));
+
+        const fallbackLocal = () => {
+          if (typeof window !== 'undefined' && window.UserDB && typeof window.UserDB.updateUser === 'function') {
+            try {
+              const updated = window.UserDB.updateUser(cleanEmail, updateData, cleanEmail);
+              return resolve({ success: true, user: updated, message: 'Perfil atualizado com sucesso!' });
+            } catch (err) {
+              return reject(err);
+            }
+          }
+          return resolve({ success: true, message: 'Dados salvos localmente.' });
+        };
+
+        const userPool = getCognitoPool();
+        if (!userPool) {
+          return fallbackLocal();
+        }
+
+        try {
+          const userData = {
+            Username: cleanEmail,
+            Pool: userPool
+          };
+          const cognitoUser = new AmazonCognitoIdentity.CognitoUser(userData);
+
+          const attributes = [];
+          if (updateData.name) {
+            attributes.push(new AmazonCognitoIdentity.CognitoUserAttribute({ Name: 'name', Value: String(updateData.name).trim() }));
+          }
+          if (updateData.drogaria) {
+            attributes.push(new AmazonCognitoIdentity.CognitoUserAttribute({ Name: 'custom:drogaria', Value: String(updateData.drogaria).trim() }));
+          }
+
+          if (attributes.length === 0) {
+            return fallbackLocal();
+          }
+
+          cognitoUser.updateAttributes(attributes, (err, result) => {
+            // Atualiza também no banco local
+            fallbackLocal();
           });
         } catch (e) {
           fallbackLocal();

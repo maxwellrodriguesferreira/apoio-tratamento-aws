@@ -863,34 +863,206 @@ function showCurrentUser() {
   }
 }
 
-function handlePasswordChange(newPass) {
+/* ==========================================================================
+   MEU PERFIL & REDEFINIÇÃO DE CREDENCIAIS
+   ========================================================================== */
+
+function openUserProfileModal() {
   const session = getAuthSession();
-  if (!session) {
-    appendLog(`⚠️ Você precisa estar conectado para alterar a senha.`, 'log-error');
+  const panel = document.getElementById('userProfilePanel');
+  if (!panel) return;
+
+  const roleEl = document.getElementById('profileDisplayRole');
+  const providerEl = document.getElementById('profileDisplayProvider');
+  const emailEl = document.getElementById('profileDisplayEmail');
+  const nameEl = document.getElementById('profileDisplayName');
+  const drogariaEl = document.getElementById('profileDisplayDrogaria');
+
+  const editNameInput = document.getElementById('profileEditNameInput');
+  const editDrogariaInput = document.getElementById('profileEditDrogariaInput');
+
+  const userEmail = session?.user || 'maxwellferreira@proton.me';
+  const userName = session?.name || DEFAULT_CONFIG.farmaceutico || 'Farmacêutico';
+  const userDrogaria = session?.drogaria || DEFAULT_CONFIG.drogaria || 'Drogasil Mogilar';
+  const userRole = session?.role === 'admin' || isSuperUser(userEmail) ? 'ADMINISTRADOR' : 'FARMACÊUTICO';
+
+  if (roleEl) {
+    roleEl.textContent = userRole;
+    roleEl.className = `badge-role ${userRole === 'ADMINISTRADOR' ? 'role-admin' : 'role-user'}`;
+  }
+  if (providerEl) {
+    const isCognito = typeof window !== 'undefined' && window.CognitoAuth && window.CognitoAuth.isConfigured();
+    providerEl.textContent = isCognito ? 'AWS Cognito' : 'Banco Seguro Local';
+  }
+  if (emailEl) emailEl.textContent = userEmail;
+  if (nameEl) nameEl.textContent = userName;
+  if (drogariaEl) drogariaEl.textContent = userDrogaria;
+
+  if (editNameInput) editNameInput.value = userName;
+  if (editDrogariaInput) editDrogariaInput.value = userDrogaria;
+
+  // Limpa campos de senha
+  const curPass = document.getElementById('profileCurrentPassInput');
+  const newPass = document.getElementById('profileNewPassInput');
+  const confPass = document.getElementById('profileConfirmNewPassInput');
+  if (curPass) curPass.value = '';
+  if (newPass) newPass.value = '';
+  if (confPass) confPass.value = '';
+
+  showProfilePassFeedback('', '');
+  showProfileDataFeedback('', '');
+
+  switchProfileTab('pass');
+  panel.hidden = false;
+}
+
+function closeUserProfileModal() {
+  const panel = document.getElementById('userProfilePanel');
+  if (panel) panel.hidden = true;
+}
+
+function switchProfileTab(tab) {
+  const tabPassBtn = document.getElementById('tabProfilePassBtn');
+  const tabDataBtn = document.getElementById('tabProfileDataBtn');
+  const passForm = document.getElementById('profileChangePassForm');
+  const dataForm = document.getElementById('profileUpdateDataForm');
+
+  if (tab === 'pass') {
+    tabPassBtn?.classList.add('active');
+    tabDataBtn?.classList.remove('active');
+    if (passForm) passForm.style.display = 'block';
+    if (dataForm) dataForm.style.display = 'none';
+  } else {
+    tabPassBtn?.classList.remove('active');
+    tabDataBtn?.classList.add('active');
+    if (passForm) passForm.style.display = 'none';
+    if (dataForm) dataForm.style.display = 'block';
+  }
+}
+
+function showProfilePassFeedback(msg, typeClass) {
+  const el = document.getElementById('profilePassFeedback');
+  if (!el) return;
+  el.className = `login-feedback ${typeClass || ''}`;
+  el.textContent = msg;
+}
+
+function showProfileDataFeedback(msg, typeClass) {
+  const el = document.getElementById('profileDataFeedback');
+  if (!el) return;
+  el.className = `login-feedback ${typeClass || ''}`;
+  el.textContent = msg;
+}
+
+function togglePasswordInputVisibility(inputId, btnId) {
+  const input = document.getElementById(inputId);
+  const btn = document.getElementById(btnId);
+  if (!input) return;
+  const isPass = input.type === 'password';
+  input.type = isPass ? 'text' : 'password';
+  if (btn) {
+    btn.textContent = isPass ? '🙈' : '👁️';
+    btn.setAttribute('aria-pressed', isPass ? 'true' : 'false');
+  }
+}
+
+async function handleProfilePasswordChangeSubmit(e) {
+  if (e) e.preventDefault();
+  const currentPass = document.getElementById('profileCurrentPassInput')?.value;
+  const newPass = document.getElementById('profileNewPassInput')?.value;
+  const confirmPass = document.getElementById('profileConfirmNewPassInput')?.value;
+  const submitBtn = document.getElementById('profilePassSubmitBtn');
+
+  const session = getAuthSession();
+  const userEmail = session?.user || 'maxwellferreira@proton.me';
+
+  if (!currentPass || !newPass || !confirmPass) {
+    showProfilePassFeedback('⚠️ Preencha todos os campos obrigatórios.', 'is-error');
     return;
   }
-  if (!newPass || newPass.length < 4) {
-    appendLog(`⚠️ A nova senha deve conter no mínimo 4 caracteres.`, 'log-warning');
+  if (newPass.length < 6) {
+    showProfilePassFeedback('⚠️ A nova senha deve ter no mínimo 6 caracteres.', 'is-error');
     return;
   }
+  if (newPass !== confirmPass) {
+    showProfilePassFeedback('⚠️ A confirmação não confere com a nova senha digitada.', 'is-error');
+    return;
+  }
+
+  if (submitBtn) submitBtn.disabled = true;
+  showProfilePassFeedback('🔄 Atualizando credenciais com segurança...', 'is-warning');
+
   try {
-    if (typeof window !== 'undefined' && window.UserDB) {
-      const users = getRegisteredUsers();
-      const target = users.find(u => u.email === session.user || u.uid === session.uid);
-      if (target) {
-        target.auditLog = target.auditLog || [];
-        target.auditLog.unshift({
-          action: 'PASSWORD_CHANGE',
-          performedBy: session.user,
-          timestamp: new Date().toISOString(),
-          details: 'Senha atualizada pelo próprio usuário'
-        });
-        saveRegisteredUsers(users);
-      }
+    if (typeof window !== 'undefined' && window.CognitoAuth && typeof window.CognitoAuth.changePassword === 'function') {
+      await window.CognitoAuth.changePassword(userEmail, currentPass, newPass);
+    } else if (typeof window !== 'undefined' && window.UserDB && typeof window.UserDB.changePassword === 'function') {
+      await window.UserDB.changePassword(userEmail, currentPass, newPass);
+    } else {
+      throw new Error('Módulo de autenticação indisponível.');
     }
-    appendLog(`✅ Senha alterada com sucesso para a conta <strong>${escapeHTML(session.user)}</strong>.`, 'log-success');
-  } catch (e) {
-    appendLog(`❌ Erro ao atualizar senha: ${escapeHTML(e.message)}`, 'log-error');
+
+    showProfilePassFeedback('✅ Senha alterada com sucesso!', 'is-success');
+    appendLog(`🔑 <strong>Credenciais atualizadas:</strong> Senha alterada com sucesso para <strong>${escapeHTML(userEmail)}</strong>.`, 'log-success');
+
+    setTimeout(() => {
+      closeUserProfileModal();
+    }, 1500);
+  } catch (err) {
+    showProfilePassFeedback(`⚠️ ${err.message || 'Falha ao alterar a senha.'}`, 'is-error');
+  } finally {
+    if (submitBtn) submitBtn.disabled = false;
+  }
+}
+
+async function handleProfileUpdateSubmit(e) {
+  if (e) e.preventDefault();
+  const name = document.getElementById('profileEditNameInput')?.value.trim();
+  const drogaria = document.getElementById('profileEditDrogariaInput')?.value.trim();
+  const submitBtn = document.getElementById('profileDataSubmitBtn');
+
+  const session = getAuthSession();
+  const userEmail = session?.user || 'maxwellferreira@proton.me';
+
+  if (!name || !drogaria) {
+    showProfileDataFeedback('⚠️ Preencha todos os campos obrigatórios.', 'is-error');
+    return;
+  }
+
+  if (submitBtn) submitBtn.disabled = true;
+  showProfileDataFeedback('🔄 Salvando alterações cadastrais...', 'is-warning');
+
+  try {
+    if (typeof window !== 'undefined' && window.CognitoAuth && typeof window.CognitoAuth.updateProfile === 'function') {
+      await window.CognitoAuth.updateProfile(userEmail, { name, drogaria });
+    } else if (typeof window !== 'undefined' && window.UserDB && typeof window.UserDB.updateUser === 'function') {
+      window.UserDB.updateUser(userEmail, { name, drogaria }, userEmail);
+    }
+
+    DEFAULT_CONFIG.farmaceutico = name;
+    DEFAULT_CONFIG.drogaria = drogaria;
+
+    if (session) {
+      session.name = name;
+      session.drogaria = drogaria;
+      saveAuthSession(session);
+      applyUserSessionProfile(session);
+    }
+
+    const nameEl = document.getElementById('profileDisplayName');
+    const drogariaEl = document.getElementById('profileDisplayDrogaria');
+    if (nameEl) nameEl.textContent = name;
+    if (drogariaEl) drogariaEl.textContent = drogaria;
+
+    showProfileDataFeedback('✅ Dados cadastrais atualizados com sucesso!', 'is-success');
+    appendLog(`👤 <strong>Perfil atualizado:</strong> Nome: <strong>${escapeHTML(name)}</strong> | Filial: <strong>${escapeHTML(drogaria)}</strong>.`, 'log-success');
+
+    setTimeout(() => {
+      closeUserProfileModal();
+    }, 1500);
+  } catch (err) {
+    showProfileDataFeedback(`⚠️ ${err.message || 'Falha ao atualizar dados.'}`, 'is-error');
+  } finally {
+    if (submitBtn) submitBtn.disabled = false;
   }
 }
 
@@ -1683,6 +1855,36 @@ async function initializeAuth() {
   document.querySelectorAll('[data-admin-close]').forEach(el => {
     el.addEventListener('click', closeAdminUsersPanel);
   });
+
+  // Listeners do Modal Meu Perfil & Redefinição de Credenciais
+  const userProfileBtn = document.getElementById('userProfileBtn');
+  const userProfileCloseBtn = document.getElementById('userProfileCloseBtn');
+  const userProfileBackdrop = document.getElementById('userProfileBackdrop');
+  const profilePassCancelBtn = document.getElementById('profilePassCancelBtn');
+  const profileDataCancelBtn = document.getElementById('profileDataCancelBtn');
+  const tabProfilePassBtn = document.getElementById('tabProfilePassBtn');
+  const tabProfileDataBtn = document.getElementById('tabProfileDataBtn');
+  const profileChangePassForm = document.getElementById('profileChangePassForm');
+  const profileUpdateDataForm = document.getElementById('profileUpdateDataForm');
+  const profileCurrentPassToggle = document.getElementById('profileCurrentPassToggle');
+  const profileNewPassToggle = document.getElementById('profileNewPassToggle');
+  const profileConfirmPassToggle = document.getElementById('profileConfirmPassToggle');
+
+  if (userProfileBtn) userProfileBtn.addEventListener('click', openUserProfileModal);
+  if (userProfileCloseBtn) userProfileCloseBtn.addEventListener('click', closeUserProfileModal);
+  if (userProfileBackdrop) userProfileBackdrop.addEventListener('click', closeUserProfileModal);
+  if (profilePassCancelBtn) profilePassCancelBtn.addEventListener('click', closeUserProfileModal);
+  if (profileDataCancelBtn) profileDataCancelBtn.addEventListener('click', closeUserProfileModal);
+
+  if (tabProfilePassBtn) tabProfilePassBtn.addEventListener('click', () => switchProfileTab('pass'));
+  if (tabProfileDataBtn) tabProfileDataBtn.addEventListener('click', () => switchProfileTab('data'));
+
+  if (profileChangePassForm) profileChangePassForm.addEventListener('submit', handleProfilePasswordChangeSubmit);
+  if (profileUpdateDataForm) profileUpdateDataForm.addEventListener('submit', handleProfileUpdateSubmit);
+
+  if (profileCurrentPassToggle) profileCurrentPassToggle.addEventListener('click', () => togglePasswordInputVisibility('profileCurrentPassInput', 'profileCurrentPassToggle'));
+  if (profileNewPassToggle) profileNewPassToggle.addEventListener('click', () => togglePasswordInputVisibility('profileNewPassInput', 'profileNewPassToggle'));
+  if (profileConfirmPassToggle) profileConfirmPassToggle.addEventListener('click', () => togglePasswordInputVisibility('profileConfirmNewPassInput', 'profileConfirmPassToggle'));
 
   if (typeof window !== 'undefined') {
     window.addEventListener('hashchange', checkAdminUrlRoute);
@@ -4355,23 +4557,27 @@ async function executeCommand(inputCmd) {
       openGeminiConfigPanel();
       break;
 
+    case 'perfil':
+    case 'conta':
+    case 'profile':
+      openUserProfileModal();
+      break;
+
     case 'usuario':
     case 'whoami':
       const currentSession = getAuthSession();
       if (currentSession && currentSession.user) {
-        appendLog(`👤 Usuário logado: <strong>${escapeHTML(currentSession.user.name)}</strong> (${escapeHTML(currentSession.user.email)}) | Cargo: <strong>${escapeHTML(currentSession.user.role || 'farmaceutico')}</strong>`, 'log-info');
+        appendLog(`👤 Usuário conectado: <strong>${escapeHTML(currentSession.name || currentSession.user)}</strong> (${escapeHTML(currentSession.user)}) | Cargo: <strong>${escapeHTML(currentSession.role || 'user')}</strong> | Filial: <strong>${escapeHTML(currentSession.drogaria || DEFAULT_CONFIG.drogaria)}</strong>`, 'log-info');
       } else {
-        appendLog(`👤 Usuário local: <strong>${escapeHTML(DEFAULT_CONFIG.farmaceutico)}</strong> (${escapeHTML(DEFAULT_CONFIG.drogaria)})`, 'log-info');
+        appendLog(`👤 Sessão local: <strong>${escapeHTML(DEFAULT_CONFIG.farmaceutico)}</strong> (${escapeHTML(DEFAULT_CONFIG.drogaria)})`, 'log-info');
       }
       break;
 
     case 'senha':
     case 'password':
-      if (parts[1]) {
-        updateUserPassword(parts[1]);
-      } else {
-        appendLog(`ℹ️ Digite <code class="log-info">senha &lt;nova_senha&gt;</code> para alterar sua senha.`, 'log-warning');
-      }
+    case 'redefinir':
+      openUserProfileModal();
+      switchProfileTab('pass');
       break;
 
     case 'sair':

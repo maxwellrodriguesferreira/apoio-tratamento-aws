@@ -718,6 +718,13 @@ const UserDB = (function() {
 
       persistUsersToStorage(users);
       return { success: true, message: 'Senha atualizada com sucesso!' };
+    },
+
+    /**
+     * Alias para alteração de senha
+     */
+    changePassword: function(identifier, oldPassword, newPassword) {
+      return this.updatePassword(identifier, oldPassword, newPassword);
     }
   };
 })();

@@ -45,6 +45,7 @@
       <button class="tool-btn primary" type="button" onclick="startWizard()">✨ Nova Mensagem</button>
       <button class="tool-btn primary btn-batch-quick" type="button" onclick="startBatchWizard()">📦 Lote WhatsApp</button>
       <button class="tool-btn" type="button" onclick="executeCommand('historico')">📜 Histórico</button>
+      <button class="tool-btn" id="userProfileBtn" type="button" title="Meu Perfil e Redefinição de Credenciais">👤 Meu Perfil</button>
       <button class="tool-btn" id="geminiConfigBtn" type="button">⚙️ Configurações</button>
       <button class="tool-btn" id="adminUsersBtn" type="button" style="display: none;" title="Painel de Controle de Usuários (/admin/users)">👥 Painel Admin <span id="pendingUsersBadge" class="badge-counter" style="display: none;">0</span></button>
       <button class="tool-btn danger" type="button" onclick="executeCommand('limpar')">🧹 Limpar</button>
@@ -482,6 +483,112 @@
       </form>
     </div>
   </div>
+
+  <!-- Modal Meu Perfil & Redefinição de Credenciais -->
+  <section class="admin-users-panel" id="userProfilePanel" aria-labelledby="userProfileTitle" hidden>
+    <div class="admin-users-backdrop" id="userProfileBackdrop"></div>
+    <div class="admin-users-card user-profile-card" role="dialog" aria-modal="true" aria-labelledby="userProfileTitle" style="max-width: 580px;">
+      <div class="admin-users-header">
+        <div>
+          <div class="super-user-badge">👤 CREDENCIAIS &bull; MEU PERFIL</div>
+          <h2 id="userProfileTitle">Meu Perfil & Redefinição de Senha</h2>
+          <p class="admin-users-subtitle">Gerencie suas informações cadastrais e atualize sua senha com segurança.</p>
+        </div>
+        <button class="gemini-icon-button" id="userProfileCloseBtn" type="button" aria-label="Fechar meu perfil">✕</button>
+      </div>
+
+      <!-- Resumo da Conta Autenticada -->
+      <div class="user-profile-badge-box" style="background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 8px; padding: 14px; margin-bottom: 16px;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+          <strong id="profileDisplayRole" class="badge-role role-admin" style="font-size: 0.8rem;">ADMINISTRADOR</strong>
+          <span id="profileDisplayProvider" class="badge-tag">AWS Cognito</span>
+        </div>
+        <div style="display: grid; gap: 4px; font-size: 0.86rem;">
+          <div><span class="log-dim">E-mail:</span> <strong id="profileDisplayEmail" style="color: var(--accent-color);">usuario@exemplo.com</strong></div>
+          <div><span class="log-dim">Nome:</span> <span id="profileDisplayName" style="color: var(--text-bright);">Dr. Maxwell</span></div>
+          <div><span class="log-dim">Unidade:</span> <span id="profileDisplayDrogaria">Drogasil Mogilar</span></div>
+        </div>
+      </div>
+
+      <!-- Abas Internas do Perfil -->
+      <div class="auth-tabs" style="margin-bottom: 16px;">
+        <button type="button" class="auth-tab-btn active" id="tabProfilePassBtn">
+          🔑 Alterar Senha
+        </button>
+        <button type="button" class="auth-tab-btn" id="tabProfileDataBtn">
+          📝 Dados Cadastrais
+        </button>
+      </div>
+
+      <!-- Formulário 1: Alteração de Senha -->
+      <form id="profileChangePassForm" novalidate autocomplete="off">
+        <div class="login-field-group">
+          <label class="login-label" for="profileCurrentPassInput">
+            <span>🔒</span> Senha Atual
+          </label>
+          <div class="login-input-wrapper password-wrapper">
+            <input id="profileCurrentPassInput" type="password" autocomplete="current-password" placeholder="Digite sua senha atual..." required>
+            <button id="profileCurrentPassToggle" type="button" aria-label="Mostrar ou ocultar senha" title="Mostrar/Ocultar senha">👁️</button>
+          </div>
+        </div>
+
+        <div class="login-field-group">
+          <label class="login-label" for="profileNewPassInput">
+            <span>🔑</span> Nova Senha (Mínimo 6 caracteres)
+          </label>
+          <div class="login-input-wrapper password-wrapper">
+            <input id="profileNewPassInput" type="password" autocomplete="new-password" placeholder="Digite a nova senha segura..." minlength="6" required>
+            <button id="profileNewPassToggle" type="button" aria-label="Mostrar ou ocultar senha" title="Mostrar/Ocultar senha">👁️</button>
+          </div>
+        </div>
+
+        <div class="login-field-group">
+          <label class="login-label" for="profileConfirmNewPassInput">
+            <span>🔒</span> Confirmar Nova Senha
+          </label>
+          <div class="login-input-wrapper password-wrapper">
+            <input id="profileConfirmNewPassInput" type="password" autocomplete="new-password" placeholder="Repita a nova senha..." minlength="6" required>
+            <button id="profileConfirmPassToggle" type="button" aria-label="Mostrar ou ocultar senha" title="Mostrar/Ocultar senha">👁️</button>
+          </div>
+        </div>
+
+        <div class="login-feedback" id="profilePassFeedback" role="alert" aria-live="polite"></div>
+
+        <div class="admin-modal-actions" style="margin-top: 14px; display: flex; justify-content: flex-end; gap: 8px;">
+          <button class="tool-btn" type="button" id="profilePassCancelBtn">Fechar</button>
+          <button class="tool-btn primary" type="submit" id="profilePassSubmitBtn">💾 Salvar Nova Senha</button>
+        </div>
+      </form>
+
+      <!-- Formulário 2: Dados Cadastrais -->
+      <form id="profileUpdateDataForm" novalidate autocomplete="off" style="display: none;">
+        <div class="login-field-group">
+          <label class="login-label" for="profileEditNameInput">
+            <span>👨‍⚕️</span> Nome Completo
+          </label>
+          <div class="login-input-wrapper">
+            <input id="profileEditNameInput" type="text" autocomplete="name" placeholder="Seu nome completo..." required>
+          </div>
+        </div>
+
+        <div class="login-field-group">
+          <label class="login-label" for="profileEditDrogariaInput">
+            <span>🏬</span> Filial / Drogaria / Unidade
+          </label>
+          <div class="login-input-wrapper">
+            <input id="profileEditDrogariaInput" type="text" autocomplete="organization" placeholder="Ex: Drogasil Mogilar..." required>
+          </div>
+        </div>
+
+        <div class="login-feedback" id="profileDataFeedback" role="alert" aria-live="polite"></div>
+
+        <div class="admin-modal-actions" style="margin-top: 14px; display: flex; justify-content: flex-end; gap: 8px;">
+          <button class="tool-btn" type="button" id="profileDataCancelBtn">Fechar</button>
+          <button class="tool-btn primary" type="submit" id="profileDataSubmitBtn">💾 Atualizar Dados</button>
+        </div>
+      </form>
+    </div>
+  </section>
 
   <!-- Modal de Configurações do Google Gemini -->
   <section class="gemini-config-panel" id="geminiConfigPanel" aria-labelledby="geminiConfigTitle" hidden>
