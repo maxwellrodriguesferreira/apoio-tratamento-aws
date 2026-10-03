@@ -530,16 +530,19 @@
         <button class="gemini-icon-button" id="campaignCloseBtn" type="button" onclick="closeCampaignModal()" aria-label="Fechar painel de campanhas">✕</button>
       </div>
 
-      <!-- Switch Geral Ativar / Desativar -->
+      <!-- Switch Geral Ativar / Desativar Profissional -->
       <div class="campaign-status-box" id="campaignStatusBox">
         <div class="campaign-status-info">
           <span class="campaign-status-indicator" id="campaignStatusDot"></span>
           <div>
-            <strong id="campaignStatusLabel" style="font-size: 0.92rem;">Campanhas Desativadas</strong>
-            <p class="log-dim" id="campaignStatusDesc" style="font-size: 0.78rem; margin-top: 2px;">Nenhuma campanha em vigor no momento.</p>
+            <div style="display: flex; align-items: center; gap: 8px;">
+              <strong id="campaignStatusLabel" style="font-size: 0.94rem;">Campanha Desativada</strong>
+              <span class="campaign-status-pill" id="campaignStatusPill">⚪ INATIVA</span>
+            </div>
+            <p class="log-dim" id="campaignStatusDesc" style="font-size: 0.78rem; margin-top: 3px;">Nenhuma campanha em vigor. As mensagens geradas não incluirão convites adicionais.</p>
           </div>
         </div>
-        <label class="toggle-switch" title="Ativar ou desativar inclusão de campanha nas mensagens">
+        <label class="toggle-switch" title="Ativar ou desativar inclusão automática desta campanha nas mensagens">
           <input type="checkbox" id="campaignToggleSwitch" onchange="toggleCampaignActive(this.checked)">
           <span class="toggle-slider"></span>
         </label>
@@ -674,9 +677,12 @@
 
         <div class="login-feedback" id="campaignFeedback" role="alert" aria-live="polite"></div>
 
-        <div class="admin-modal-actions" style="margin-top: 14px; display: flex; justify-content: flex-end; gap: 8px;">
+        <div class="admin-modal-actions" style="margin-top: 14px; display: flex; justify-content: space-between; align-items: center; gap: 8px;">
           <button class="tool-btn" type="button" id="campaignCancelBtn" onclick="closeCampaignModal()">Fechar</button>
-          <button class="tool-btn primary" type="submit" id="campaignSaveBtn">💾 Salvar & Ativar Campanha</button>
+          <div style="display: flex; gap: 8px;">
+            <button class="tool-btn danger" type="button" id="campaignDeactivateActionBtn" onclick="deactivateCampaign()" style="display: none;">🔴 Desativar Campanha</button>
+            <button class="tool-btn primary" type="submit" id="campaignSaveBtn">🚀 Salvar & Ativar Campanha</button>
+          </div>
         </div>
       </form>
     </div>

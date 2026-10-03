@@ -2302,10 +2302,8 @@ function openCampaignModal() {
   const iconSelect = document.getElementById('campaignIconSelect');
   const highlightInput = document.getElementById('campaignHighlightInput');
   const toggleSwitch = document.getElementById('campaignToggleSwitch');
-  const statusLabel = document.getElementById('campaignStatusLabel');
-  const statusDesc = document.getElementById('campaignStatusDesc');
-  const statusBox = document.getElementById('campaignStatusBox');
-  const statusDot = document.getElementById('campaignStatusDot');
+  const deactivateBtn = document.getElementById('campaignDeactivateActionBtn');
+  const saveBtn = document.getElementById('campaignSaveBtn');
 
   if (nameInput) nameInput.value = camp.name || '';
   if (periodInput) periodInput.value = camp.period || '';
@@ -2313,12 +2311,10 @@ function openCampaignModal() {
   if (highlightInput) highlightInput.value = camp.highlightText || '';
   if (toggleSwitch) toggleSwitch.checked = Boolean(camp.enabled);
 
-  if (statusBox) statusBox.classList.toggle('is-active', Boolean(camp.enabled));
-  if (statusDot) statusDot.classList.toggle('is-active', Boolean(camp.enabled));
-  if (statusLabel) statusLabel.textContent = camp.enabled ? '🟢 Campanha Ativa e em Destaque' : '⚪ Campanhas Desativadas';
-  if (statusDesc) statusDesc.textContent = camp.enabled 
-    ? 'As mensagens geradas incluirão automaticamente o convite desta campanha.' 
-    : 'Nenhuma informação de campanha será incluída nas mensagens.';
+  if (deactivateBtn) deactivateBtn.style.display = camp.enabled ? 'inline-block' : 'none';
+  if (saveBtn) saveBtn.textContent = camp.enabled ? '🚀 Salvar & Ativar Campanha' : '💾 Salvar Configurações';
+
+  toggleCampaignActive(Boolean(camp.enabled));
 
   // Atualizar chips de serviços selecionados
   const container = document.getElementById('campaignServicesTags');
@@ -2359,14 +2355,32 @@ function toggleCampaignActive(isChecked) {
   const statusBox = document.getElementById('campaignStatusBox');
   const statusDot = document.getElementById('campaignStatusDot');
   const statusLabel = document.getElementById('campaignStatusLabel');
+  const statusPill = document.getElementById('campaignStatusPill');
   const statusDesc = document.getElementById('campaignStatusDesc');
+  const deactivateBtn = document.getElementById('campaignDeactivateActionBtn');
+  const saveBtn = document.getElementById('campaignSaveBtn');
 
   if (statusBox) statusBox.classList.toggle('is-active', isChecked);
   if (statusDot) statusDot.classList.toggle('is-active', isChecked);
-  if (statusLabel) statusLabel.textContent = isChecked ? '🟢 Campanha Ativa e em Destaque' : '⚪ Campanhas Desativadas';
-  if (statusDesc) statusDesc.textContent = isChecked 
-    ? 'As mensagens geradas incluirão automaticamente o convite desta campanha.' 
-    : 'Nenhuma informação de campanha será incluída nas mensagens.';
+  if (statusPill) {
+    statusPill.classList.toggle('is-active', isChecked);
+    statusPill.textContent = isChecked ? '🟢 ATIVA' : '⚪ INATIVA';
+  }
+  if (statusLabel) {
+    statusLabel.textContent = isChecked ? 'Campanha Ativa e em Destaque' : 'Campanha Desativada';
+  }
+  if (statusDesc) {
+    statusDesc.textContent = isChecked 
+      ? 'Os convites dos serviços selecionados estão sendo anexados nas mensagens geradas em lote.' 
+      : 'Nenhuma campanha em vigor. As mensagens geradas não incluirão convites adicionais.';
+  }
+
+  if (deactivateBtn) {
+    deactivateBtn.style.display = isChecked ? 'inline-block' : 'none';
+  }
+  if (saveBtn) {
+    saveBtn.textContent = isChecked ? '🚀 Salvar & Ativar Campanha' : '💾 Salvar Configurações';
+  }
 
   updateCampaignUIStatus();
   updateCampaignPreview();
@@ -2472,6 +2486,7 @@ function handleSaveCampaign(e) {
   const icon = document.getElementById('campaignIconSelect')?.value || '🩺';
   const highlightText = document.getElementById('campaignHighlightInput')?.value.trim();
   const services = getSelectedServicesFromModal();
+  const isEnabled = document.getElementById('campaignToggleSwitch')?.checked !== false;
 
   if (!name || !highlightText) {
     const feedback = document.getElementById('campaignFeedback');
@@ -2486,7 +2501,7 @@ function handleSaveCampaign(e) {
   const presetId = activePresetBtn ? activePresetBtn.dataset.preset : 'custom';
 
   const updatedCamp = {
-    enabled: true,
+    enabled: isEnabled,
     id: presetId,
     name,
     period: period || 'nesta semana',
@@ -2497,18 +2512,21 @@ function handleSaveCampaign(e) {
   };
 
   saveActiveCampaign(updatedCamp);
-
-  const toggleSwitch = document.getElementById('campaignToggleSwitch');
-  if (toggleSwitch) toggleSwitch.checked = true;
-  toggleCampaignActive(true);
+  toggleCampaignActive(isEnabled);
 
   const feedback = document.getElementById('campaignFeedback');
   if (feedback) {
     feedback.className = 'login-feedback is-success';
-    feedback.textContent = '🎉 Campanha salva e ativada com sucesso! Redirecionando para Gerador em Lote...';
+    feedback.textContent = isEnabled 
+      ? '🎉 Campanha salva e ativada com sucesso! Redirecionando para Gerador em Lote...' 
+      : '💾 Configurações de campanha salvas com sucesso!';
   }
 
-  appendLog(`🎯 <strong>Campanha Ativada:</strong> <strong>${escapeHTML(name)}</strong> (${escapeHTML((services.length > 0 ? services : ['Serviços Gratuitos']).join(', '))}) agora será incluída nas mensagens!`, 'log-success');
+  if (isEnabled) {
+    appendLog(`🎯 <strong>Campanha Ativada:</strong> <strong>${escapeHTML(name)}</strong> (${escapeHTML((services.length > 0 ? services : ['Serviços Gratuitos']).join(', '))}) agora será incluída nas mensagens!`, 'log-success');
+  } else {
+    appendLog(`💾 Configurações da campanha <strong>${escapeHTML(name)}</strong> salvas (atualmente desativada).`, 'log-info');
+  }
 
   setTimeout(() => {
     closeCampaignModal();
@@ -2527,8 +2545,18 @@ function deactivateCampaign() {
   if (toggleSwitch) toggleSwitch.checked = false;
   toggleCampaignActive(false);
 
-  appendLog(`ℹ️ Campanha de saúde foi <strong>desativada</strong>.`, 'log-info');
-  closeCampaignModal();
+  const feedback = document.getElementById('campaignFeedback');
+  if (feedback) {
+    feedback.className = 'login-feedback is-warning';
+    feedback.textContent = '⚪ Campanha desativada com sucesso.';
+  }
+
+  appendLog(`⚪ <strong>Campanha Desativada:</strong> As próximas mensagens em lote não conterão convites de campanha.`, 'log-info');
+  setTimeout(() => {
+    closeCampaignModal();
+    if (feedback) feedback.textContent = '';
+    startBatchWizard();
+  }, 350);
 }
 
 function initializeCampaignModule() {

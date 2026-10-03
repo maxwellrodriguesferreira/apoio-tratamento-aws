@@ -2289,47 +2289,87 @@ button, input, select, textarea, a {
 /* Status Box & Toggle Switch no Modal */
 .campaign-status-box {
   background: var(--bg-card);
-  border: 1px solid var(--border-color);
-  border-radius: 8px;
-  padding: 12px 16px;
+  border: 1.5px solid var(--border-color);
+  border-radius: 10px;
+  padding: 14px 18px;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
+  gap: 14px;
   margin-bottom: 16px;
-  transition: all 0.2s ease;
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
 }
 
 .campaign-status-box.is-active {
-  border-color: rgba(0, 255, 102, 0.4);
-  background: rgba(0, 255, 102, 0.05);
+  border-color: #00ff88;
+  background: linear-gradient(135deg, rgba(0, 255, 136, 0.08), rgba(0, 229, 255, 0.04));
+  box-shadow: 0 0 16px rgba(0, 255, 136, 0.15);
 }
 
 .campaign-status-info {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 12px;
 }
 
 .campaign-status-indicator {
-  width: 12px;
-  height: 12px;
+  width: 14px;
+  height: 14px;
   border-radius: 50%;
-  background: #666;
+  background: #555;
   display: inline-block;
-  transition: background-color 0.2s ease;
+  transition: all 0.3s ease;
+  flex-shrink: 0;
 }
 
 .campaign-status-indicator.is-active {
-  background: #00ff66;
-  box-shadow: 0 0 8px #00ff66;
+  background: #00ff88;
+  box-shadow: 0 0 10px #00ff88;
+  animation: pulse-green 2s infinite;
+}
+
+@keyframes pulse-green {
+  0% {
+    box-shadow: 0 0 0 0 rgba(0, 255, 136, 0.7);
+  }
+  70% {
+    box-shadow: 0 0 0 8px rgba(0, 255, 136, 0);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(0, 255, 136, 0);
+  }
+}
+
+.campaign-status-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 0.74rem;
+  font-weight: 700;
+  padding: 3px 10px;
+  border-radius: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--text-dim);
+  border: 1px solid var(--border-color);
+  transition: all 0.2s ease;
+}
+
+.campaign-status-pill.is-active {
+  background: rgba(0, 255, 136, 0.15);
+  color: #00ff88;
+  border-color: #00ff88;
+  box-shadow: 0 0 8px rgba(0, 255, 136, 0.3);
 }
 
 .toggle-switch {
   position: relative;
-  display: inline-block;
-  width: 48px;
-  height: 26px;
+  display: inline-flex;
+  align-items: center;
+  width: 54px;
+  height: 28px;
   flex-shrink: 0;
   cursor: pointer;
 }
@@ -2344,33 +2384,34 @@ button, input, select, textarea, a {
   position: absolute;
   cursor: pointer;
   inset: 0;
-  background-color: var(--bg-primary);
-  border: 1px solid var(--border-color);
+  background-color: rgba(255, 255, 255, 0.08);
+  border: 1.5px solid var(--border-color);
   transition: .3s cubic-bezier(0.4, 0, 0.2, 1);
-  border-radius: 26px;
+  border-radius: 28px;
 }
 
 .toggle-slider:before {
   position: absolute;
   content: "";
-  height: 18px;
-  width: 18px;
+  height: 20px;
+  width: 20px;
   left: 3px;
-  bottom: 3px;
+  bottom: 2.5px;
   background-color: var(--text-dim);
   transition: .3s cubic-bezier(0.4, 0, 0.2, 1);
   border-radius: 50%;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.4);
 }
 
 .toggle-switch input:checked + .toggle-slider {
-  background-color: rgba(0, 255, 102, 0.2);
-  border-color: #00ff66;
+  background-color: rgba(0, 255, 136, 0.25);
+  border-color: #00ff88;
 }
 
 .toggle-switch input:checked + .toggle-slider:before {
-  transform: translateX(22px);
-  background-color: #00ff66;
-  box-shadow: 0 0 6px #00ff66;
+  transform: translateX(26px);
+  background-color: #00ff88;
+  box-shadow: 0 0 10px #00ff88;
 }
 
 /* Presets Grid */
