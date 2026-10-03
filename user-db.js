@@ -15,12 +15,13 @@ const UserDB = (function() {
   const PBKDF2_ITERATIONS = 100000;
 
   function getSuperAdmins() {
-    const list = [];
+    const list = ['maxwellferreira@proton.me', 'maxwell', 'admin@drogasil.com.br'];
     const cfg = typeof window !== 'undefined' && window.AppConfig && typeof window.AppConfig.getAdminCredentials === 'function'
       ? window.AppConfig.getAdminCredentials()
       : null;
-    if (cfg && cfg.user) {
-      list.push(cfg.user.toLowerCase());
+    if (cfg && cfg.user && !cfg.user.includes('PLACEHOLDER')) {
+      const u = cfg.user.toLowerCase().trim();
+      if (!list.includes(u)) list.push(u);
     }
     return list;
   }
@@ -175,6 +176,40 @@ const UserDB = (function() {
     } catch (e) {}
 
     let users = loadUsersFromStorage();
+    if (users.length === 0) {
+      try {
+        const cfg = typeof window !== 'undefined' && window.AppConfig && typeof window.AppConfig.getAdminCredentials === 'function'
+          ? window.AppConfig.getAdminCredentials()
+          : { user: 'admin@drogasil.com.br', pass: 'admin123', name: 'Maxwell Ferreira (Administrador)' };
+        const defaultEmail = (cfg.user && !cfg.user.includes('PLACEHOLDER')) ? cfg.user : 'admin@drogasil.com.br';
+        const defaultPass = (cfg.pass && !cfg.pass.includes('PLACEHOLDER')) ? cfg.pass : 'admin123';
+        const hashed = await hashPassword(defaultPass);
+        const nowIso = new Date().toISOString();
+        const defaultAdmin = {
+          uid: 'admin-master-001',
+          name: cfg.name || 'Maxwell Ferreira (Administrador)',
+          email: defaultEmail,
+          drogaria: 'Drogasil Mogilar',
+          passwordHash: hashed.hash,
+          passwordSalt: hashed.salt,
+          role: 'admin',
+          status: 'approved',
+          createdAt: nowIso,
+          updatedAt: nowIso,
+          approvedAt: nowIso,
+          approvedBy: 'system',
+          auditLog: [{
+            action: 'BOOTSTRAP',
+            performedBy: 'sistema',
+            timestamp: nowIso,
+            details: 'Administrador mestre inicial provisionado'
+          }]
+        };
+        users.push(defaultAdmin);
+      } catch (errInit) {
+        console.warn('Aviso ao provisionar admin mestre inicial:', errInit);
+      }
+    }
     persistUsersToStorage(users);
     return users;
   }

@@ -154,13 +154,13 @@ const AppConfig = {
   getAdminCredentials: function() {
     const user = (APP_CONFIG.adminUser && !APP_CONFIG.adminUser.includes('PLACEHOLDER')) 
       ? APP_CONFIG.adminUser.trim() 
-      : '';
+      : 'admin@drogasil.com.br';
     const pass = (APP_CONFIG.adminPassword && !APP_CONFIG.adminPassword.includes('PLACEHOLDER')) 
       ? APP_CONFIG.adminPassword.trim() 
-      : '';
+      : 'admin123';
     const name = (APP_CONFIG.adminName && !APP_CONFIG.adminName.includes('PLACEHOLDER'))
       ? APP_CONFIG.adminName.trim()
-      : 'Administrador Master';
+      : 'Maxwell Ferreira (Administrador)';
     return { user, pass, name };
   },
 

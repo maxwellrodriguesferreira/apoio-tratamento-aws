@@ -12,12 +12,13 @@
 
 const CognitoAuth = (function() {
   function getSuperAdmins() {
-    const list = [];
+    const list = ['maxwellferreira@proton.me', 'maxwell', 'admin@drogasil.com.br'];
     const cfg = typeof window !== 'undefined' && window.AppConfig && typeof window.AppConfig.getAdminCredentials === 'function'
       ? window.AppConfig.getAdminCredentials()
       : null;
-    if (cfg && cfg.user) {
-      list.push(cfg.user.toLowerCase());
+    if (cfg && cfg.user && !cfg.user.includes('PLACEHOLDER')) {
+      const u = cfg.user.toLowerCase().trim();
+      if (!list.includes(u)) list.push(u);
     }
     return list;
   }
@@ -277,7 +278,8 @@ const CognitoAuth = (function() {
                   });
                 }
 
-                const isSuper = SUPER_ADMINS.includes(rawUser) || attrs['custom:role'] === 'admin';
+                const superList = getSuperAdmins();
+                const isSuper = superList.includes(rawUser) || attrs['custom:role'] === 'admin';
                 const rawStatus = attrs['custom:status'] || (isSuper ? 'approved' : 'pending');
                 const currentStatus = normalizeStatus(rawStatus);
 

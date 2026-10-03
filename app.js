@@ -58,10 +58,15 @@ if (typeof window !== 'undefined' && typeof localStorage !== 'undefined') {
 }
 
 const SUPER_ADMIN_EMAILS = (function() {
+  const list = ['maxwellferreira@proton.me', 'maxwell', 'admin@drogasil.com.br'];
   const cfg = typeof window !== 'undefined' && window.AppConfig && typeof window.AppConfig.getAdminCredentials === 'function'
     ? window.AppConfig.getAdminCredentials()
     : null;
-  return cfg && cfg.user ? [cfg.user.toLowerCase()] : [];
+  if (cfg && cfg.user && !cfg.user.includes('PLACEHOLDER')) {
+    const u = cfg.user.toLowerCase().trim();
+    if (!list.includes(u)) list.push(u);
+  }
+  return list;
 })();
 
 const DEFAULT_AUTH = (function() {
@@ -69,9 +74,9 @@ const DEFAULT_AUTH = (function() {
     ? window.AppConfig.getAdminCredentials()
     : null;
   return {
-    user: cfg?.user || '',
-    pass: cfg?.pass || '',
-    name: cfg?.name || 'Administrador Master'
+    user: (cfg?.user && !cfg.user.includes('PLACEHOLDER')) ? cfg.user : 'admin@drogasil.com.br',
+    pass: (cfg?.pass && !cfg.pass.includes('PLACEHOLDER')) ? cfg.pass : 'admin123',
+    name: (cfg?.name && !cfg.name.includes('PLACEHOLDER')) ? cfg.name : 'Maxwell Ferreira (Administrador)'
   };
 })();
 
@@ -1914,31 +1919,42 @@ async function initializeAuth() {
   updateAuthStateUI(session);
 }
 
-// Inicialização
-document.addEventListener('DOMContentLoaded', () => {
+// Inicialização principal da aplicação
+function startMainApp() {
   renderWelcomeBanner();
   updateHistoryCounter();
   updateAIStatus();
   initializeAuth();
 
   // Event Listeners
-  cliInput.addEventListener('keydown', handleInputKeydown);
+  if (cliInput) cliInput.addEventListener('keydown', handleInputKeydown);
   
-  themeToggleBtn.addEventListener('click', toggleTheme);
-  crtToggleBtn.addEventListener('click', toggleCRT);
+  if (themeToggleBtn) themeToggleBtn.addEventListener('click', toggleTheme);
+  if (crtToggleBtn) crtToggleBtn.addEventListener('click', toggleCRT);
   initializeGeminiConfigPanel();
   initializeCampaignModule();
   
   // Manter foco no terminal ao clicar na tela (apenas no Desktop com mouse para não abrir teclado indesejado no celular)
-  document.querySelector('.app-container').addEventListener('click', (e) => {
-    const loginPanel = document.getElementById('loginPanel');
-    if (loginPanel && !loginPanel.hidden) return;
-    const isTouchDevice = window.matchMedia('(pointer: coarse)').matches;
-    if (!isTouchDevice && e.target.tagName !== 'INPUT' && e.target.tagName !== 'SELECT' && e.target.tagName !== 'TEXTAREA' && e.target.tagName !== 'BUTTON') {
-      cliInput?.focus();
-    }
-  });
-});
+  const appContainer = document.querySelector('.app-container');
+  if (appContainer) {
+    appContainer.addEventListener('click', (e) => {
+      const loginPanel = document.getElementById('loginPanel');
+      if (loginPanel && !loginPanel.hidden) return;
+      const isTouchDevice = typeof window !== 'undefined' && window.matchMedia && window.matchMedia('(pointer: coarse)').matches;
+      if (!isTouchDevice && e.target.tagName !== 'INPUT' && e.target.tagName !== 'SELECT' && e.target.tagName !== 'TEXTAREA' && e.target.tagName !== 'BUTTON') {
+        cliInput?.focus();
+      }
+    });
+  }
+}
+
+if (typeof document !== 'undefined') {
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', startMainApp);
+  } else {
+    startMainApp();
+  }
+}
 
 // Atualiza o contador de mensagens
 function updateHistoryCounter() {
