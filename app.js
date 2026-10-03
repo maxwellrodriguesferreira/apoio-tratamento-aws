@@ -1275,32 +1275,33 @@ function renderAdminUsersTable() {
       modInfo = `<small class="log-dim" style="color:#ff0055;">Bloqueado: ${escapeHTML(u.blockedBy)}</small>`;
     }
 
-    const emailEsc = escapeHTML(u.email);
+    const emailEsc = escapeHTML(u.email || u.uid || '');
+    const emailJs = (u.email || u.uid || '').replace(/'/g, "\\'");
     let actionsHTML = '';
 
     if (isRootAdmin) {
       actionsHTML = `
         <span class="log-dim" style="font-size: 0.76rem; font-weight: 700; color: #ffd700;">👑 Admin Mestre</span>
-        <button class="admin-btn-action btn-details" data-action="details" data-email="${emailEsc}" title="Ver Detalhes">📄 Detalhes</button>
+        <button type="button" class="admin-btn-action btn-details" data-action="details" data-email="${emailEsc}" onclick="viewUserDetailsAction('${emailJs}')" title="Ver Detalhes">📄 Detalhes</button>
       `;
     } else {
       let statusBtns = '';
       if (statusClean === 'pending') {
         statusBtns = `
-          <button class="admin-btn-action btn-approve" data-action="approve" data-email="${emailEsc}" title="Aprovar usuário">✅ Aprovar</button>
-          <button class="admin-btn-action btn-reject" data-action="reject" data-email="${emailEsc}" title="Rejeitar usuário com motivo">❌ Rejeitar</button>
+          <button type="button" class="admin-btn-action btn-approve" data-action="approve" data-email="${emailEsc}" onclick="approveUserAction('${emailJs}')" title="Aprovar usuário">✅ Aprovar</button>
+          <button type="button" class="admin-btn-action btn-reject" data-action="reject" data-email="${emailEsc}" onclick="openRejectUserModal('${emailJs}')" title="Rejeitar usuário com motivo">❌ Rejeitar</button>
         `;
       } else if (statusClean === 'approved') {
         statusBtns = `
-          <button class="admin-btn-action btn-block" data-action="block" data-email="${emailEsc}" title="Bloquear acesso deste usuário">🚫 Bloquear</button>
+          <button type="button" class="admin-btn-action btn-block" data-action="block" data-email="${emailEsc}" onclick="blockUserAction('${emailJs}')" title="Bloquear acesso deste usuário">🚫 Bloquear</button>
         `;
       } else if (statusClean === 'blocked') {
         statusBtns = `
-          <button class="admin-btn-action btn-unblock" data-action="unblock" data-email="${emailEsc}" title="Desbloquear acesso deste usuário">🔓 Desbloquear</button>
+          <button type="button" class="admin-btn-action btn-unblock" data-action="unblock" data-email="${emailEsc}" onclick="unblockUserAction('${emailJs}')" title="Desbloquear acesso deste usuário">🔓 Desbloquear</button>
         `;
       } else if (statusClean === 'rejected') {
         statusBtns = `
-          <button class="admin-btn-action btn-approve" data-action="approve" data-email="${emailEsc}" title="Reavaliar e aprovar">✅ Aprovar</button>
+          <button type="button" class="admin-btn-action btn-approve" data-action="approve" data-email="${emailEsc}" onclick="approveUserAction('${emailJs}')" title="Reavaliar e aprovar">✅ Aprovar</button>
         `;
       }
 
@@ -1309,10 +1310,10 @@ function renderAdminUsersTable() {
 
       actionsHTML = `
         ${statusBtns}
-        <button class="admin-btn-action btn-role" data-action="role" data-email="${emailEsc}" title="${toggleRoleTitle}">${toggleRoleText}</button>
-        <button class="admin-btn-action btn-details" data-action="details" data-email="${emailEsc}" title="Ver detalhes completos e auditoria">📄 Detalhes</button>
-        <button class="admin-btn-action btn-edit" data-action="edit" data-email="${emailEsc}" title="Editar dados cadastrais">✏️ Editar</button>
-        <button class="admin-btn-action btn-delete" data-action="delete" data-email="${emailEsc}" title="Excluir usuário">🗑️ Excluir</button>
+        <button type="button" class="admin-btn-action btn-role" data-action="role" data-email="${emailEsc}" onclick="toggleRoleUserAction('${emailJs}')" title="${toggleRoleTitle}">${toggleRoleText}</button>
+        <button type="button" class="admin-btn-action btn-details" data-action="details" data-email="${emailEsc}" onclick="viewUserDetailsAction('${emailJs}')" title="Ver detalhes completos e auditoria">📄 Detalhes</button>
+        <button type="button" class="admin-btn-action btn-edit" data-action="edit" data-email="${emailEsc}" onclick="editUserAction('${emailJs}')" title="Editar dados cadastrais">✏️ Editar</button>
+        <button type="button" class="admin-btn-action btn-delete" data-action="delete" data-email="${emailEsc}" onclick="deleteUserAction('${emailJs}')" title="Excluir usuário">🗑️ Excluir</button>
       `;
     }
 
@@ -1655,12 +1656,18 @@ function closeAdminDetailsModal() {
 
 async function editUserAction(emailOrUid) {
   const users = getRegisteredUsers();
-  const target = users.find(u => u.email === emailOrUid || u.uid === emailOrUid);
-  if (!target) return;
+  const target = users.find(u => 
+    (u.email && u.email.toLowerCase() === String(emailOrUid).toLowerCase()) ||
+    (u.uid && u.uid === emailOrUid)
+  );
+  if (!target) {
+    alert('Usuário não encontrado para edição.');
+    return;
+  }
 
-  const newName = prompt(`Editar Nome do Usuário para ${target.email}:`, target.name);
+  const newName = prompt(`Editar Nome do Usuário (${target.email}):`, target.name);
   if (newName === null) return;
-  const newDrogaria = prompt(`Editar Drogaria/Filial para ${target.email}:`, target.drogaria);
+  const newDrogaria = prompt(`Editar Drogaria/Filial (${target.email}):`, target.drogaria);
   if (newDrogaria === null) return;
 
   const session = getAuthSession();
@@ -1696,14 +1703,10 @@ async function editUserAction(emailOrUid) {
 
 async function deleteUserAction(emailOrUid) {
   const session = getAuthSession();
-  if (!session || !isSuperUser(session.user)) {
+  const isSuper = session && (session.role === 'admin' || isSuperUser(session.user) || isSuperUser(session.uid));
+  if (!isSuper) {
+    alert('⚠️ Apenas Administradores têm permissão para deletar usuários.');
     appendLog('⚠️ Apenas <strong>Administradores</strong> têm permissão para deletar usuários.', 'log-error');
-    return false;
-  }
-
-  if (isSuperUser(emailOrUid)) {
-    alert('🛡️ Proteção de Segurança: O Administrador Mestre NUNCA pode ser excluído.');
-    appendLog(`🛡️ Operação negada: O Administrador Mestre inicial não pode ser deletado.`, 'log-warning');
     return false;
   }
 
@@ -1714,7 +1717,14 @@ async function deleteUserAction(emailOrUid) {
   );
 
   if (!target) {
+    alert(`Usuário "${emailOrUid}" não encontrado para exclusão.`);
     appendLog(`⚠️ Usuário "${escapeHTML(emailOrUid)}" não encontrado para exclusão.`, 'log-warning');
+    return false;
+  }
+
+  if (target.email === 'admin@drogasil.com.br' || target.uid === 'admin-master-001') {
+    alert('🛡️ Proteção de Segurança: O Administrador Mestre inicial não pode ser excluído.');
+    appendLog(`🛡️ Operação negada: O Administrador Mestre inicial não pode ser deletado.`, 'log-warning');
     return false;
   }
 
@@ -1722,7 +1732,7 @@ async function deleteUserAction(emailOrUid) {
     `Deseja realmente DELETAR o usuário:\n` +
     `• Nome: ${target.name}\n` +
     `• E-mail: ${target.email}\n` +
-    `• Status Atual: ${target.status.toUpperCase()}\n\n` +
+    `• Status Atual: ${String(target.status).toUpperCase()}\n\n` +
     `Esta ação é irreversível e removerá o cadastro no banco de dados.`;
 
   if (!confirm(confirmMsg)) return false;
@@ -1733,10 +1743,10 @@ async function deleteUserAction(emailOrUid) {
     } catch (e) {
       console.warn('Falha no UserDB.deleteUser:', e);
     }
-  } else {
-    const filtered = users.filter(u => u.email !== target.email && u.uid !== target.uid);
-    saveRegisteredUsers(filtered);
   }
+
+  const filtered = users.filter(u => u.email !== target.email && u.uid !== target.uid);
+  saveRegisteredUsers(filtered);
 
   if (session.user === target.email || session.uid === target.uid) {
     clearAuthSession();
@@ -2380,17 +2390,18 @@ function applyCampaignPreset(presetId) {
 
   toggleCampaignActive(true);
 
-  // Atualizar chips
+  // Atualizar seleção visual de cada chip de serviço
   const container = document.getElementById('campaignServicesTags');
   if (container) {
     const chips = container.querySelectorAll('.service-chip');
     chips.forEach(chip => {
       const sName = chip.dataset.service;
-      const isIncluded = preset.services.includes(sName);
+      const isIncluded = Array.isArray(preset.services) && preset.services.includes(sName);
       chip.classList.toggle('active', isIncluded);
     });
   }
 
+  // Atualizar seleção visual do preset selecionado
   document.querySelectorAll('.campaign-preset-card').forEach(btn => {
     btn.classList.toggle('active', btn.dataset.preset === presetId);
   });
@@ -2401,6 +2412,16 @@ function applyCampaignPreset(presetId) {
 function toggleServiceTag(chipEl) {
   if (!chipEl) return;
   chipEl.classList.toggle('active');
+
+  const selectedServices = getSelectedServicesFromModal();
+  document.querySelectorAll('.campaign-preset-card').forEach(btn => {
+    const p = CAMPAIGN_PRESETS[btn.dataset.preset];
+    if (p && Array.isArray(p.services)) {
+      const isMatch = p.services.length === selectedServices.length && p.services.every(s => selectedServices.includes(s));
+      btn.classList.toggle('active', isMatch);
+    }
+  });
+
   updateCampaignPreview();
 }
 
@@ -2470,7 +2491,7 @@ function handleSaveCampaign(e) {
     name,
     period: period || 'nesta semana',
     icon,
-    services: services.length > 0 ? services : ['Aferição de Pressão', 'Glicemia'],
+    services: services.length > 0 ? services : ['Aferição de Pressão Gratuita'],
     highlightText,
     extraNote: 'Atendimento profissional humanizado.'
   };
@@ -2484,7 +2505,7 @@ function handleSaveCampaign(e) {
   const feedback = document.getElementById('campaignFeedback');
   if (feedback) {
     feedback.className = 'login-feedback is-success';
-    feedback.textContent = '🎉 Campanha salva e ativada com sucesso!';
+    feedback.textContent = '🎉 Campanha salva e ativada com sucesso! Redirecionando para Gerador em Lote...';
   }
 
   appendLog(`🎯 <strong>Campanha Ativada:</strong> <strong>${escapeHTML(name)}</strong> (${escapeHTML((services.length > 0 ? services : ['Serviços Gratuitos']).join(', '))}) agora será incluída nas mensagens!`, 'log-success');
@@ -2492,7 +2513,9 @@ function handleSaveCampaign(e) {
   setTimeout(() => {
     closeCampaignModal();
     if (feedback) feedback.textContent = '';
-  }, 400);
+    // Retorna para a tela de gerar novas mensagens em lote
+    startBatchWizard();
+  }, 350);
 }
 
 function deactivateCampaign() {
