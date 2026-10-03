@@ -256,6 +256,10 @@ function setAuthSession(userData, remember) {
   }
 }
 
+function saveAuthSession(userData, remember = true) {
+  setAuthSession(userData, remember);
+}
+
 function clearAuthSession() {
   if (typeof sessionStorage !== 'undefined') sessionStorage.removeItem('apoio_auth_session');
   if (typeof localStorage !== 'undefined') localStorage.removeItem('apoio_auth_session');
