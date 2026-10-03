@@ -44,6 +44,7 @@
     <nav class="quick-toolbar" aria-label="Ações Rápidas">
       <button class="tool-btn primary" type="button" onclick="startWizard()">✨ Nova Mensagem</button>
       <button class="tool-btn primary btn-batch-quick" type="button" onclick="startBatchWizard()">📦 Lote WhatsApp</button>
+      <button class="tool-btn btn-campaign-quick" id="campaignToolbarBtn" type="button" onclick="openCampaignModal()" title="Campanhas de Saúde & Atendimentos Gratuitos (Glicemia, Pressão, Bioimpedância)">🎯 Campanhas <span id="campaignToolbarBadge" class="badge-counter badge-campaign" style="display: none;">ATIVA</span></button>
       <button class="tool-btn" type="button" onclick="executeCommand('historico')">📜 Histórico</button>
       <button class="tool-btn" id="userProfileBtn" type="button" title="Meu Perfil e Redefinição de Credenciais">👤 Meu Perfil</button>
       <button class="tool-btn" id="geminiConfigBtn" type="button">⚙️ Configurações</button>
@@ -512,6 +513,142 @@
         <div class="admin-modal-actions" style="margin-top: 14px; display: flex; justify-content: flex-end; gap: 8px;">
           <button class="tool-btn" type="button" id="profileDataCancelBtn">Fechar</button>
           <button class="tool-btn primary" type="submit" id="profileDataSubmitBtn">💾 Atualizar Dados</button>
+        </div>
+      </form>
+    </div>
+  </section>
+
+  <!-- Painel de Gestão de Campanhas de Saúde (Glicemia, Pressão, Bioimpedância, etc.) -->
+  <section class="admin-users-panel campaign-panel" id="campaignPanel" aria-labelledby="campaignModalTitle" hidden>
+    <div class="admin-users-backdrop" id="campaignBackdrop" data-campaign-close></div>
+    <div class="admin-users-card campaign-card" role="dialog" aria-modal="true" aria-labelledby="campaignModalTitle" style="max-width: 680px;">
+      <div class="admin-users-header">
+        <div>
+          <div class="super-user-badge">📢 COMUNICAÇÃO CLÍNICA &bull; CAMPANHAS EM DESTAQUE</div>
+          <h2 id="campaignModalTitle">🎯 Gestão de Campanhas de Saúde</h2>
+          <p class="admin-users-subtitle">Ative campanhas sazonais ou de serviços gratuitos (Glicemia, Pressão, Bioimpedância) para inclusão automática e destacada nas mensagens.</p>
+        </div>
+        <button class="gemini-icon-button" id="campaignCloseBtn" type="button" aria-label="Fechar painel de campanhas">✕</button>
+      </div>
+
+      <!-- Switch Geral Ativar / Desativar -->
+      <div class="campaign-status-box" id="campaignStatusBox">
+        <div class="campaign-status-info">
+          <span class="campaign-status-indicator" id="campaignStatusDot"></span>
+          <div>
+            <strong id="campaignStatusLabel" style="font-size: 0.92rem;">Campanhas Desativadas</strong>
+            <p class="log-dim" id="campaignStatusDesc" style="font-size: 0.78rem; margin-top: 2px;">Nenhuma campanha em vigor no momento.</p>
+          </div>
+        </div>
+        <label class="toggle-switch" title="Ativar ou desativar inclusão de campanha nas mensagens">
+          <input type="checkbox" id="campaignToggleSwitch" onchange="toggleCampaignActive(this.checked)">
+          <span class="toggle-slider"></span>
+        </label>
+      </div>
+
+      <!-- Presets Rápidos -->
+      <div style="margin-bottom: 14px;">
+        <label class="login-label" style="margin-bottom: 8px; font-size: 0.84rem;">⚡ Presets Rápidos de Campanhas Clínicas:</label>
+        <div class="campaign-preset-grid">
+          <button type="button" class="campaign-preset-card active" data-preset="cardio" onclick="applyCampaignPreset('cardio')">
+            <span class="preset-icon">🩺</span>
+            <div class="preset-info">
+              <strong>Pressão & Glicemia</strong>
+              <small>Aferição gratuita</small>
+            </div>
+          </button>
+          <button type="button" class="campaign-preset-card" data-preset="bioimpedancia" onclick="applyCampaignPreset('bioimpedancia')">
+            <span class="preset-icon">⚖️</span>
+            <div class="preset-info">
+              <strong>Bioimpedância</strong>
+              <small>Composição corporal</small>
+            </div>
+          </button>
+          <button type="button" class="campaign-preset-card" data-preset="diabetes" onclick="applyCampaignPreset('diabetes')">
+            <span class="preset-icon">🩸</span>
+            <div class="preset-info">
+              <strong>Prevenção Diabetes</strong>
+              <small>Glicemia & cuidados</small>
+            </div>
+          </button>
+          <button type="button" class="campaign-preset-card" data-preset="custom" onclick="applyCampaignPreset('custom')">
+            <span class="preset-icon">✨</span>
+            <div class="preset-info">
+              <strong>Personalizada</strong>
+              <small>Crie sua campanha</small>
+            </div>
+          </button>
+        </div>
+      </div>
+
+      <!-- Formulário da Campanha -->
+      <form id="campaignForm" onsubmit="handleSaveCampaign(event)" novalidate>
+        <div class="login-field-group">
+          <label class="login-label" for="campaignNameInput">
+            <span>🏷️</span> Nome da Campanha
+          </label>
+          <div class="login-input-wrapper">
+            <input id="campaignNameInput" type="text" placeholder="Ex: Campanha de Saúde Cardiovascular & Glicemia Gratuita" required oninput="updateCampaignPreview()">
+          </div>
+        </div>
+
+        <div class="form-row" style="margin-bottom: 12px;">
+          <div class="form-group" style="margin-bottom: 0;">
+            <label>⏱️ Período / Validade da Campanha:</label>
+            <input type="text" id="campaignPeriodInput" placeholder="Ex: nesta semana / até sábado às 18h / durante este mês" required oninput="updateCampaignPreview()">
+          </div>
+          <div class="form-group" style="margin-bottom: 0;">
+            <label>🩺 Ícone de Destaque:</label>
+            <select id="campaignIconSelect" onchange="updateCampaignPreview()">
+              <option value="🩺">🩺 Estetoscópio / Saúde</option>
+              <option value="🩸">🩸 Glicemia / Diabetes</option>
+              <option value="⚖️">⚖️ Bioimpedância / Peso</option>
+              <option value="❤️">❤️ Coração / Cardiovascular</option>
+              <option value="💉">💉 Injetáveis / Vacinação</option>
+              <option value="🌟">🌟 Promoção Especial</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="login-field-group">
+          <label class="login-label">
+            <span>🩺</span> Serviços Gratuitos / Inclusos na Campanha:
+          </label>
+          <div class="campaign-tags-container" id="campaignServicesTags">
+            <button type="button" class="service-chip active" data-service="Aferição de Pressão Gratuita" onclick="toggleServiceTag(this)">🩺 Aferição de Pressão Gratuita</button>
+            <button type="button" class="service-chip active" data-service="Teste de Glicemia Capilar Gratuito" onclick="toggleServiceTag(this)">🩸 Teste de Glicemia Gratuito</button>
+            <button type="button" class="service-chip" data-service="Exame de Bioimpedância Gratuito" onclick="toggleServiceTag(this)">⚖️ Exame de Bioimpedância Gratuito</button>
+            <button type="button" class="service-chip" data-service="Orientação Farmacêutica Especializada" onclick="toggleServiceTag(this)">👨‍⚕️ Orientação Farmacêutica</button>
+            <button type="button" class="service-chip" data-service="Aplicação de Injetáveis" onclick="toggleServiceTag(this)">💉 Aplicação de Injetáveis</button>
+            <button type="button" class="service-chip" data-service="Perfuração do Lóbulo Auricular" onclick="toggleServiceTag(this)">👂 Furo de Orelha</button>
+          </div>
+        </div>
+
+        <div class="login-field-group">
+          <label class="login-label" for="campaignHighlightInput">
+            <span>💬</span> Texto do Convite / Chamada para o Cliente:
+          </label>
+          <div class="login-input-wrapper">
+            <textarea id="campaignHighlightInput" rows="2" class="admin-textarea" placeholder="Ex: Aproveite para passar na farmácia esta semana para realizar gratuitamente sua aferição de pressão e teste de glicemia!" required oninput="updateCampaignPreview()"></textarea>
+          </div>
+        </div>
+
+        <!-- Pré-Visualização da Mensagem de Destaque -->
+        <div class="campaign-preview-box">
+          <div class="campaign-preview-header">
+            <span>📱 Pré-visualização da Chamada (Formato WhatsApp)</span>
+          </div>
+          <div class="campaign-preview-body" id="campaignPreviewBody">
+            <!-- Atualizado dinamicamente -->
+          </div>
+        </div>
+
+        <div class="login-feedback" id="campaignFeedback" role="alert" aria-live="polite"></div>
+
+        <div class="admin-modal-actions" style="margin-top: 14px; display: flex; justify-content: flex-end; gap: 8px;">
+          <button class="tool-btn" type="button" id="campaignCancelBtn" onclick="closeCampaignModal()">Fechar</button>
+          <button class="tool-btn danger" type="button" id="campaignDeactivateBtn" onclick="deactivateCampaign()">Desativar</button>
+          <button class="tool-btn primary" type="submit" id="campaignSaveBtn">💾 Salvar & Ativar Campanha</button>
         </div>
       </form>
     </div>

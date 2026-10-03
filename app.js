@@ -1927,6 +1927,7 @@ document.addEventListener('DOMContentLoaded', () => {
   themeToggleBtn.addEventListener('click', toggleTheme);
   crtToggleBtn.addEventListener('click', toggleCRT);
   initializeGeminiConfigPanel();
+  initializeCampaignModule();
   
   // Manter foco no terminal ao clicar na tela (apenas no Desktop com mouse para não abrir teclado indesejado no celular)
   document.querySelector('.app-container').addEventListener('click', (e) => {
@@ -1995,13 +1996,393 @@ function renderWelcomeBanner() {
       <div class="welcome-creator">
         <span>👨‍⚕️💻 Criado pelo desenvolvedor e farmacêutico <strong>Maxwell Rodrigues Ferreira</strong> · Inscrito no <strong>CRF-SP nº 86426</strong></span>
       </div>
-      <p style="margin-top: 8px;">✨ <strong>Como começar:</strong> Clique nos botões acima ou digite <code class="log-info">novo</code>, <code class="log-info">lote</code> ou <code class="log-info">sobre</code> no terminal abaixo.</p>
+      <p style="margin-top: 8px;">✨ <strong>Como começar:</strong> Clique nos botões acima ou digite <code class="log-info">novo</code>, <code class="log-info">lote</code>, <code class="log-info">campanha</code> ou <code class="log-info">sobre</code> no terminal abaixo.</p>
     </div>
   `;
   const div = document.createElement('div');
   div.innerHTML = bannerHTML;
   terminalOutput.appendChild(div);
+  renderCampaignActiveBanner();
   scrollToBottom();
+}
+
+/* ==========================================================================
+   MÓDULO DE GESTÃO DE CAMPANHAS DE SAÚDE (GLICEMIA, PRESSÃO, BIOIMPEDÂNCIA)
+   ========================================================================== */
+
+const CAMPAIGN_PRESETS = {
+  cardio: {
+    id: 'cardio',
+    name: 'Campanha de Saúde Cardiovascular & Glicemia',
+    icon: '🩺',
+    period: 'nesta semana',
+    services: ['Aferição de Pressão Gratuita', 'Teste de Glicemia Capilar Gratuito'],
+    highlightText: 'Aproveite para passar na farmácia esta semana para realizar gratuitamente sua aferição de pressão arterial e teste de glicemia com nossa equipe farmacêutica!',
+    extraNote: 'Atendimento preventivo e rápido para monitorar sua saúde de perto.'
+  },
+  bioimpedancia: {
+    id: 'bioimpedancia',
+    name: 'Semana da Composição Corporal & Bioimpedância',
+    icon: '⚖️',
+    period: 'durante este mês',
+    services: ['Exame de Bioimpedância Gratuito', 'Avaliação de Massa Magra e Gordura'],
+    highlightText: 'Estamos realizando o exame de bioimpedância gratuito na farmácia para você acompanhar sua evolução corporal, massa muscular e hidratação!',
+    extraNote: 'Relatório imediato com orientações farmacêuticas personalizadas.'
+  },
+  diabetes: {
+    id: 'diabetes',
+    name: 'Campanha de Prevenção & Controle do Diabetes',
+    icon: '🩸',
+    period: 'neste mês',
+    services: ['Teste de Glicemia Capilar Gratuito', 'Orientação Farmacêutica Especializada'],
+    highlightText: 'Participe da nossa ação especial de prevenção ao diabetes com teste de glicemia gratuito e orientações de saúde na farmácia!',
+    extraNote: 'Cuidado contínuo e acolhimento para sua qualidade de vida.'
+  },
+  custom: {
+    id: 'custom',
+    name: 'Campanha de Saúde & Serviços Gratuitos',
+    icon: '✨',
+    period: 'neste período',
+    services: ['Aferição de Pressão Gratuita', 'Teste de Glicemia Capilar Gratuito', 'Exame de Bioimpedância Gratuito'],
+    highlightText: 'Venha conferir nossos serviços de saúde gratuitos e orientações farmacêuticas especiais na drogaria!',
+    extraNote: 'Esperamos por você para cuidar do seu bem-estar.'
+  }
+};
+
+const DEFAULT_CAMPAIGN_STATE = {
+  enabled: true,
+  id: 'cardio',
+  name: 'Campanha de Saúde Cardiovascular & Glicemia',
+  icon: '🩺',
+  period: 'nesta semana',
+  services: ['Aferição de Pressão Gratuita', 'Teste de Glicemia Capilar Gratuito', 'Exame de Bioimpedância Gratuito'],
+  highlightText: 'Aproveite para passar na farmácia esta semana para realizar gratuitamente sua aferição de pressão arterial, teste de glicemia e bioimpedância!',
+  extraNote: 'Atendimento humanizado e sem custos para toda a família.'
+};
+
+function getActiveCampaign() {
+  try {
+    const raw = localStorage.getItem('apoio_active_campaign');
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (parsed && typeof parsed === 'object') return parsed;
+    }
+  } catch (e) {
+    console.error('Erro ao recuperar campanha ativa:', e);
+  }
+  return { ...DEFAULT_CAMPAIGN_STATE };
+}
+
+function saveActiveCampaign(campaign) {
+  try {
+    localStorage.setItem('apoio_active_campaign', JSON.stringify(campaign));
+  } catch (e) {
+    console.error('Erro ao persistir campanha:', e);
+  }
+  updateCampaignUIStatus();
+  renderCampaignActiveBanner();
+}
+
+function isCampaignActive() {
+  const camp = getActiveCampaign();
+  return Boolean(camp && camp.enabled);
+}
+
+function formatCampaignMessageBlock(campaign, drogaria = '') {
+  if (!campaign || !campaign.enabled) return '';
+  const drogStr = drogaria ? ` na ${drogaria}` : '';
+  const servicesStr = (campaign.services && campaign.services.length) ? ` (${campaign.services.join(' • ')})` : '';
+  const periodStr = campaign.period ? ` _[${campaign.period}]_` : '';
+  
+  return `\n\n📢 *${campaign.icon || '🎯'} Ação de Saúde 100% Gratuita${drogStr}:* *${campaign.name}*${periodStr}!\n` +
+         `👉 ${campaign.highlightText}${servicesStr ? '\n✨ *Serviços 100% Gratuitos:* ' + campaign.services.join(', ') : ''}`;
+}
+
+function updateCampaignUIStatus() {
+  const camp = getActiveCampaign();
+  const badge = document.getElementById('campaignToolbarBadge');
+  const btn = document.getElementById('campaignToolbarBtn');
+  
+  if (badge) {
+    if (camp && camp.enabled) {
+      badge.style.display = 'inline-block';
+      badge.textContent = '1 ATIVA';
+      badge.className = 'badge-counter badge-campaign';
+    } else {
+      badge.style.display = 'none';
+    }
+  }
+
+  if (btn) {
+    btn.classList.toggle('active', Boolean(camp && camp.enabled));
+  }
+}
+
+function renderCampaignActiveBanner() {
+  const existing = document.getElementById('campaignActiveBanner');
+  if (existing) existing.remove();
+
+  const camp = getActiveCampaign();
+  if (!camp || !camp.enabled) return;
+
+  const servicesText = (camp.services && camp.services.length) ? camp.services.join(' • ') : 'Serviços Gratuitos';
+  const periodText = camp.period ? ` (${camp.period})` : '';
+
+  const bannerDiv = document.createElement('div');
+  bannerDiv.className = 'campaign-active-banner';
+  bannerDiv.id = 'campaignActiveBanner';
+  bannerDiv.innerHTML = `
+    <div class="campaign-active-banner-content">
+      <span class="campaign-active-icon">${escapeHTML(camp.icon || '🎯')}</span>
+      <div>
+        <div class="campaign-active-title">
+          <span>📢 CAMPANHA ATIVA: <strong>${escapeHTML(camp.name)}</strong></span>
+          <span class="badge-tag" style="background: #00ff66; color: #000; font-weight: 700; font-size: 0.65rem;">DESTAQUE ATIVADO</span>
+        </div>
+        <div class="campaign-active-services">
+          ✨ <strong>${escapeHTML(servicesText)}</strong>${escapeHTML(periodText)} &bull; ${escapeHTML(camp.highlightText)}
+        </div>
+      </div>
+    </div>
+    <div class="campaign-active-actions">
+      <button type="button" class="tool-btn" onclick="openCampaignModal()" style="font-size: 0.74rem; padding: 4px 10px;">⚙️ Gerenciar</button>
+      <button type="button" class="tool-btn danger" onclick="deactivateCampaign()" title="Desativar campanha" style="font-size: 0.74rem; padding: 4px 8px;">✕</button>
+    </div>
+  `;
+
+  // Inserir no topo do terminal após o banner inicial, se houver
+  const welcome = terminalOutput.querySelector('.welcome-banner');
+  if (welcome && welcome.nextSibling) {
+    terminalOutput.insertBefore(bannerDiv, welcome.nextSibling);
+  } else if (terminalOutput.firstChild) {
+    terminalOutput.insertBefore(bannerDiv, terminalOutput.firstChild);
+  } else {
+    terminalOutput.appendChild(bannerDiv);
+  }
+}
+
+function openCampaignModal() {
+  const panel = document.getElementById('campaignPanel');
+  if (!panel) return;
+  panel.hidden = false;
+
+  const camp = getActiveCampaign();
+  const nameInput = document.getElementById('campaignNameInput');
+  const periodInput = document.getElementById('campaignPeriodInput');
+  const iconSelect = document.getElementById('campaignIconSelect');
+  const highlightInput = document.getElementById('campaignHighlightInput');
+  const toggleSwitch = document.getElementById('campaignToggleSwitch');
+  const statusLabel = document.getElementById('campaignStatusLabel');
+  const statusDesc = document.getElementById('campaignStatusDesc');
+  const statusBox = document.getElementById('campaignStatusBox');
+  const statusDot = document.getElementById('campaignStatusDot');
+
+  if (nameInput) nameInput.value = camp.name || '';
+  if (periodInput) periodInput.value = camp.period || '';
+  if (iconSelect) iconSelect.value = camp.icon || '🩺';
+  if (highlightInput) highlightInput.value = camp.highlightText || '';
+  if (toggleSwitch) toggleSwitch.checked = Boolean(camp.enabled);
+
+  if (statusBox) statusBox.classList.toggle('is-active', Boolean(camp.enabled));
+  if (statusDot) statusDot.classList.toggle('is-active', Boolean(camp.enabled));
+  if (statusLabel) statusLabel.textContent = camp.enabled ? '🟢 Campanha Ativa e em Destaque' : '⚪ Campanhas Desativadas';
+  if (statusDesc) statusDesc.textContent = camp.enabled 
+    ? 'As mensagens geradas incluirão automaticamente o convite desta campanha.' 
+    : 'Nenhuma informação de campanha será incluída nas mensagens.';
+
+  // Atualizar chips de serviços selecionados
+  const container = document.getElementById('campaignServicesTags');
+  if (container) {
+    const chips = container.querySelectorAll('.service-chip');
+    chips.forEach(chip => {
+      const sName = chip.dataset.service;
+      const isSelected = Array.isArray(camp.services) && camp.services.includes(sName);
+      chip.classList.toggle('active', isSelected);
+    });
+  }
+
+  // Atualizar preset ativo se houver correspondência
+  document.querySelectorAll('.campaign-preset-card').forEach(btn => {
+    btn.classList.toggle('active', btn.dataset.preset === camp.id);
+  });
+
+  updateCampaignPreview();
+}
+
+function closeCampaignModal() {
+  const panel = document.getElementById('campaignPanel');
+  if (panel) panel.hidden = true;
+}
+
+function toggleCampaignActive(isChecked) {
+  const statusBox = document.getElementById('campaignStatusBox');
+  const statusDot = document.getElementById('campaignStatusDot');
+  const statusLabel = document.getElementById('campaignStatusLabel');
+  const statusDesc = document.getElementById('campaignStatusDesc');
+
+  if (statusBox) statusBox.classList.toggle('is-active', isChecked);
+  if (statusDot) statusDot.classList.toggle('is-active', isChecked);
+  if (statusLabel) statusLabel.textContent = isChecked ? '🟢 Campanha Ativa e em Destaque' : '⚪ Campanhas Desativadas';
+  if (statusDesc) statusDesc.textContent = isChecked 
+    ? 'As mensagens geradas incluirão automaticamente o convite desta campanha.' 
+    : 'Nenhuma informação de campanha será incluída nas mensagens.';
+
+  updateCampaignPreview();
+}
+
+function applyCampaignPreset(presetId) {
+  const preset = CAMPAIGN_PRESETS[presetId];
+  if (!preset) return;
+
+  const nameInput = document.getElementById('campaignNameInput');
+  const periodInput = document.getElementById('campaignPeriodInput');
+  const iconSelect = document.getElementById('campaignIconSelect');
+  const highlightInput = document.getElementById('campaignHighlightInput');
+  const toggleSwitch = document.getElementById('campaignToggleSwitch');
+
+  if (nameInput) nameInput.value = preset.name;
+  if (periodInput) periodInput.value = preset.period;
+  if (iconSelect) iconSelect.value = preset.icon;
+  if (highlightInput) highlightInput.value = preset.highlightText;
+  if (toggleSwitch) toggleSwitch.checked = true;
+
+  toggleCampaignActive(true);
+
+  // Atualizar chips
+  const container = document.getElementById('campaignServicesTags');
+  if (container) {
+    const chips = container.querySelectorAll('.service-chip');
+    chips.forEach(chip => {
+      const sName = chip.dataset.service;
+      const isIncluded = preset.services.includes(sName);
+      chip.classList.toggle('active', isIncluded);
+    });
+  }
+
+  document.querySelectorAll('.campaign-preset-card').forEach(btn => {
+    btn.classList.toggle('active', btn.dataset.preset === presetId);
+  });
+
+  updateCampaignPreview();
+}
+
+function toggleServiceTag(chipEl) {
+  if (!chipEl) return;
+  chipEl.classList.toggle('active');
+  updateCampaignPreview();
+}
+
+function getSelectedServicesFromModal() {
+  const container = document.getElementById('campaignServicesTags');
+  if (!container) return [];
+  const selected = [];
+  container.querySelectorAll('.service-chip.active').forEach(chip => {
+    if (chip.dataset.service) selected.push(chip.dataset.service);
+  });
+  return selected;
+}
+
+function updateCampaignPreview() {
+  const previewBody = document.getElementById('campaignPreviewBody');
+  if (!previewBody) return;
+
+  const isEnabled = document.getElementById('campaignToggleSwitch')?.checked;
+  if (!isEnabled) {
+    previewBody.innerHTML = '<span class="log-dim">⚪ A campanha está desativada. As mensagens não conterão convites de campanha.</span>';
+    return;
+  }
+
+  const name = document.getElementById('campaignNameInput')?.value.trim() || 'Campanha de Saúde';
+  const period = document.getElementById('campaignPeriodInput')?.value.trim() || 'neste período';
+  const icon = document.getElementById('campaignIconSelect')?.value || '🩺';
+  const highlight = document.getElementById('campaignHighlightInput')?.value.trim() || 'Venha conferir nossos atendimentos gratuitos!';
+  const services = getSelectedServicesFromModal();
+  const drogaria = DEFAULT_CONFIG.drogaria || 'Drogasil Mogilar';
+
+  const mockCamp = {
+    enabled: true,
+    name,
+    period,
+    icon,
+    highlightText: highlight,
+    services
+  };
+
+  const previewText = formatCampaignMessageBlock(mockCamp, drogaria);
+  previewBody.textContent = previewText.trim();
+}
+
+function handleSaveCampaign(e) {
+  if (e) e.preventDefault();
+  const isEnabled = document.getElementById('campaignToggleSwitch')?.checked;
+  const name = document.getElementById('campaignNameInput')?.value.trim();
+  const period = document.getElementById('campaignPeriodInput')?.value.trim();
+  const icon = document.getElementById('campaignIconSelect')?.value || '🩺';
+  const highlightText = document.getElementById('campaignHighlightInput')?.value.trim();
+  const services = getSelectedServicesFromModal();
+
+  if (!name || !highlightText) {
+    const feedback = document.getElementById('campaignFeedback');
+    if (feedback) {
+      feedback.className = 'login-feedback is-error';
+      feedback.textContent = '⚠️ Por favor, informe o nome da campanha e o texto de convite.';
+    }
+    return;
+  }
+
+  const activePresetBtn = document.querySelector('.campaign-preset-card.active');
+  const presetId = activePresetBtn ? activePresetBtn.dataset.preset : 'custom';
+
+  const updatedCamp = {
+    enabled: Boolean(isEnabled),
+    id: presetId,
+    name,
+    period: period || 'nesta semana',
+    icon,
+    services: services.length > 0 ? services : ['Aferição de Pressão', 'Glicemia'],
+    highlightText,
+    extraNote: 'Atendimento profissional humanizado.'
+  };
+
+  saveActiveCampaign(updatedCamp);
+
+  const feedback = document.getElementById('campaignFeedback');
+  if (feedback) {
+    feedback.className = 'login-feedback is-success';
+    feedback.textContent = isEnabled ? '🎉 Campanha salva e ativada com sucesso!' : '✅ Configurações salvas (Campanha desativada).';
+  }
+
+  if (isEnabled) {
+    appendLog(`🎯 <strong>Campanha Ativada:</strong> <strong>${escapeHTML(name)}</strong> (${escapeHTML(services.join(', '))}) agora será incluída nas mensagens!`, 'log-success');
+  } else {
+    appendLog(`ℹ️ Campanha de saúde foi <strong>desativada</strong>.`, 'log-info');
+  }
+
+  setTimeout(() => {
+    closeCampaignModal();
+    if (feedback) feedback.textContent = '';
+  }, 900);
+}
+
+function deactivateCampaign() {
+  const camp = getActiveCampaign();
+  camp.enabled = false;
+  saveActiveCampaign(camp);
+
+  const toggleSwitch = document.getElementById('campaignToggleSwitch');
+  if (toggleSwitch) toggleSwitch.checked = false;
+  toggleCampaignActive(false);
+
+  appendLog(`ℹ️ Campanha de saúde foi <strong>desativada</strong>.`, 'log-info');
+  closeCampaignModal();
+}
+
+function initializeCampaignModule() {
+  const closeBtn = document.getElementById('campaignCloseBtn');
+  const backdrop = document.getElementById('campaignBackdrop');
+  if (closeBtn) closeBtn.addEventListener('click', closeCampaignModal);
+  if (backdrop) backdrop.addEventListener('click', closeCampaignModal);
+  updateCampaignUIStatus();
 }
 
 /* ==========================================================================
@@ -2081,6 +2462,7 @@ const MESSAGE_TEMPLATES = {
     const sintomaTxt = data.sintoma ? ` em relação a ${data.sintoma}` : '';
     const dicaTxt = data.dica ? `\n\n💡 *Dica do Farmacêutico:* ${data.dica}` : '';
     const tempoTxt = data.tempo ? ` (${data.tempo})` : '';
+    const campTxt = data.campaignBlock || '';
 
     if (data.classification.type === 'servico') {
       const sub = data.classification.subType;
@@ -2109,7 +2491,7 @@ const MESSAGE_TEMPLATES = {
       return `${saudacao}, ${data.nome}! Tudo bem com você? 😊\n\n` +
         `Aqui é o farmacêutico **${data.farmaceutico}**, da **${data.drogaria}**!\n\n` +
         `Estou passando para acompanhar ${pergServico}\n\n` +
-        `Se tiver qualquer dúvida sobre os cuidados pós-atendimento ou precisar de um novo serviço, pode me avisar por aqui a qualquer momento. Estou à sua inteira disposição!${dicaTxt}\n\n` +
+        `Se tiver qualquer dúvida sobre os cuidados pós-atendimento ou precisar de um novo serviço, pode me avisar por aqui a qualquer momento. Estou à sua inteira disposição!${dicaTxt}${campTxt}\n\n` +
         `Desejo muita saúde e um dia abençoado! 💚\n\n` +
         `Atenciosamente,\n` +
         `*${data.farmaceutico}* | ${data.drogaria}`;
@@ -2118,7 +2500,7 @@ const MESSAGE_TEMPLATES = {
     return `${saudacao}, ${data.nome}! Tudo bem com você? 😊\n\n` +
       `Aqui é o farmacêutico **${data.farmaceutico}**, da **${data.drogaria}**!\n\n` +
       `Estou passando para saber como você está se sentindo${sintomaTxt} e como está indo o acompanhamento com o medicamento **${data.medicamento}**${tempoTxt}. O tratamento está sendo tranquilo?\n\n` +
-      `Se tiver qualquer dúvida sobre as doses, horários ou se sentir algum desconforto, pode me avisar por aqui a qualquer momento. Meu compromisso é garantir que você se recupere com toda a segurança e conforto!${dicaTxt}\n\n` +
+      `Se tiver qualquer dúvida sobre as doses, horários ou se sentir algum desconforto, pode me avisar por aqui a qualquer momento. Meu compromisso é garantir que você se recupere com toda a segurança e conforto!${dicaTxt}${campTxt}\n\n` +
       `Desejo uma excelente recuperação e um dia abençoado! 💚\n\n` +
       `Atenciosamente,\n` +
       `*${data.farmaceutico}* | ${data.drogaria}`;
@@ -2128,12 +2510,13 @@ const MESSAGE_TEMPLATES = {
     const saudacao = getSaudacaoHorario();
     const sintomaTxt = data.sintoma ? ` em relação a ${data.sintoma}` : '';
     const dicaTxt = data.dica ? `\n\n📌 *Lembrete importante:* ${data.dica}` : '';
+    const campTxt = data.campaignBlock || '';
 
     if (data.classification.type === 'servico') {
       return `${saudacao}, ${data.nome}! Como vai? Espero que esteja muito bem!\n\n` +
         `Quem fala é o ${data.farmaceutico}, farmacêutico da ${data.drogaria}.\n\n` +
         `Gostaria de acompanhar de perto o seu atendimento de **${data.medicamento}**: correu tudo bem? Notou estabilização ou melhora dos seus sintomas${sintomaTxt}?\n\n` +
-        `Lembre-se da importância de manter as rotinas e cuidados orientados na farmácia.${dicaTxt}\n\n` +
+        `Lembre-se da importância de manter as rotinas e cuidados orientados na farmácia.${dicaTxt}${campTxt}\n\n` +
         `Caso precise de qualquer suporte ou novo procedimento/aferição, conte comigo!\n\n` +
         `Um abraço e se cuide!\n` +
         `*${data.farmaceutico}* - ${data.drogaria}`;
@@ -2142,7 +2525,7 @@ const MESSAGE_TEMPLATES = {
     return `${saudacao}, ${data.nome}! Como vai? Espero que esteja muito bem!\n\n` +
       `Quem fala é o ${data.farmaceutico}, farmacêutico da ${data.drogaria}.\n\n` +
       `Gostaria de acompanhar de perto o seu bem-estar: deu tudo certo com a medicação **${data.medicamento}**? Notou melhorias nos sintomas${sintomaTxt}?\n\n` +
-      `Lembre-se da importância de manter os horários certinhos da dose para a eficácia completa do seu tratamento.${dicaTxt}\n\n` +
+      `Lembre-se da importância de manter os horários certinhos da dose para a eficácia completa do seu tratamento.${dicaTxt}${campTxt}\n\n` +
       `Caso precise de qualquer orientação ou apoio profissional, pode contar comigo!\n\n` +
       `Um abraço e se cuide!\n` +
       `*${data.farmaceutico}* - ${data.drogaria}`;
@@ -2150,12 +2533,13 @@ const MESSAGE_TEMPLATES = {
 
   descontraido: (data) => {
     const dicaTxt = data.dica ? `\n\n Ah, e não se esqueça: ${data.dica} 😉` : '';
+    const campTxt = data.campaignBlock || '';
 
     if (data.classification.type === 'servico') {
       return `Oi, ${data.nome}! Tudo certinho com você? 🙋♂️\n\n` +
         `Aqui é o ${data.farmaceutico} da ${data.drogaria}!\n\n` +
         `Estou passando rapidinho pra saber como você está após o procedimento de **${data.medicamento}**! Correu tudo bem no atendimento?\n\n` +
-        `Se precisar de mais alguma coisa ou tiver qualquer dúvida, só me mandar uma mensagem aqui, tá bom?${dicaTxt}\n\n` +
+        `Se precisar de mais alguma coisa ou tiver qualquer dúvida, só me mandar uma mensagem aqui, tá bom?${dicaTxt}${campTxt}\n\n` +
         `Tenha um ótimo dia! ✨\n\n` +
         `Abraço,\n` +
         `*${data.farmaceutico}* | ${data.drogaria}`;
@@ -2164,18 +2548,20 @@ const MESSAGE_TEMPLATES = {
     return `Oi, ${data.nome}! Tudo certinho com você? 🙋♂️\n\n` +
       `Aqui é o ${data.farmaceutico} da ${data.drogaria}!\n\n` +
       `Estou passando rapidinho pra saber como você está se sentindo e se deu tudo certo com o **${data.medicamento}**! Já sentiu a melhora?\n\n` +
-      `Qualquer dúvida que você tiver sobre o remédio, só me mandar uma mensagem aqui, tá bom? Estou sempre por aqui pra ajudar!${dicaTxt}\n\n` +
+      `Qualquer dúvida que você tiver sobre o remédio, só me mandar uma mensagem aqui, tá bom? Estou sempre por aqui pra ajudar!${dicaTxt}${campTxt}\n\n` +
       `Tenha um ótimo dia e melhore logo! ✨\n\n` +
       `Abraço,\n` +
       `*${data.farmaceutico}* | ${data.drogaria}`;
   },
 
   pos_tratamento: (data) => {
+    const campTxt = data.campaignBlock || '';
+
     if (data.classification.type === 'servico') {
       return `Olá, ${data.nome}! Como você está?\n\n` +
         `Aqui é o farmacêutico ${data.farmaceutico}, da ${data.drogaria}.\n\n` +
         `Passando para saber como ficou sua saúde após a realização do serviço de **${data.medicamento}**. Está se sentindo 100% recuperado(a)?\n\n` +
-        `Caso precise agendar um novo atendimento, nova aferição ou qualquer outro suporte para sua saúde, conte sempre com nossa equipe na ${data.drogaria}.\n\n` +
+        `Caso precise agendar um novo atendimento, nova aferição ou qualquer outro suporte para sua saúde, conte sempre com nossa equipe na ${data.drogaria}.${campTxt}\n\n` +
         `Desejo muita saúde!\n\n` +
         `Atenciosamente,\n` +
         `*${data.farmaceutico}* - ${data.drogaria}`;
@@ -2184,7 +2570,7 @@ const MESSAGE_TEMPLATES = {
     return `Olá, ${data.nome}! Como você está?\n\n` +
       `Aqui é o farmacêutico ${data.farmaceutico}, da ${data.drogaria}.\n\n` +
       `Passando para acompanhar a fase final do seu tratamento com o **${data.medicamento}**. Como você está se sentindo agora? Já se sente 100% recuperado(a)?\n\n` +
-      `Caso precise de reposição, nova orientação médica/farmacêutica ou qualquer suporte para sua saúde, conte sempre com nossa equipe na ${data.drogaria}.\n\n` +
+      `Caso precise de reposição, nova orientação médica/farmacêutica ou qualquer suporte para sua saúde, conte sempre com nossa equipe na ${data.drogaria}.${campTxt}\n\n` +
       `Desejo muita saúde!\n\n` +
       `Atenciosamente,\n` +
       `*${data.farmaceutico}* - ${data.drogaria}`;
@@ -2204,6 +2590,8 @@ function getSaudacaoHorario() {
 function generateMessages(params) {
   const itemInput = params.medicamento || params.item || 'Medicamento / Serviço';
   const classification = classifyItem(itemInput, params.tipoOverride || 'auto');
+  const activeCampaign = (params.includeCampaign !== false && isCampaignActive()) ? getActiveCampaign() : null;
+  const campaignBlock = activeCampaign ? formatCampaignMessageBlock(activeCampaign, params.drogaria || DEFAULT_CONFIG.drogaria) : '';
 
   const data = {
     nome: capitalizeName(params.nome || 'Cliente'),
@@ -2214,13 +2602,16 @@ function generateMessages(params) {
     sintoma: params.sintoma || '',
     tempo: params.tempo || '',
     dica: params.dica || '',
-    telefone: params.telefone ? params.telefone.replace(/\D/g, '') : ''
+    telefone: params.telefone ? params.telefone.replace(/\D/g, '') : '',
+    campaign: activeCampaign,
+    campaignBlock: campaignBlock
   };
 
   const generated = {
     id: Date.now(),
     timestamp: new Date().toLocaleString('pt-BR'),
     clientData: data,
+    campaign: activeCampaign,
     versions: {
       empatico: MESSAGE_TEMPLATES.empatico(data),
       atencioso: MESSAGE_TEMPLATES.atencioso(data),
@@ -2572,6 +2963,7 @@ function sanitizeGeminiJsonResponse(rawText) {
 async function generateMessagesAI(params) {
   const itemInput = params.medicamento || params.item || 'Medicamento / Serviço';
   const classification = classifyItem(itemInput, params.tipoOverride || 'auto');
+  const activeCampaign = (params.includeCampaign !== false && isCampaignActive()) ? getActiveCampaign() : null;
 
   const data = {
     nome: capitalizeName(params.nome || 'Cliente'),
@@ -2582,8 +2974,16 @@ async function generateMessagesAI(params) {
     sintoma: params.sintoma || '',
     tempo: params.tempo || '',
     dica: params.dica || '',
-    telefone: params.telefone ? params.telefone.replace(/\D/g, '') : ''
+    telefone: params.telefone ? params.telefone.replace(/\D/g, '') : '',
+    campaign: activeCampaign
   };
+
+  const campaignPromptInstruction = activeCampaign ? `
+- CAMPANHA DE SAÚDE EM DESTAQUE NA DROGARIA: "${activeCampaign.name}" (${activeCampaign.period}).
+  Serviços Gratuitos/Inclusos: ${activeCampaign.services.join(', ')}.
+  Texto de Destaque/Convite: "${activeCampaign.highlightText}".
+  DIRETRIZ DE CAMPANHA: Destaque de forma acolhedora, calorosa e fluida nas 4 variações de mensagens um convite para o cliente aproveitar esses serviços de saúde gratuitos/promocionais na drogaria como um benefício especial!
+` : '';
 
   const prompt = `
 Você é o Farmacêutico ${data.farmaceutico} da filial ${data.drogaria}.
@@ -2594,7 +2994,7 @@ DADOS DO ATENDIMENTO:
 - Item/Serviço: ${data.medicamento} (Categoria Identificada: ${data.classification.label})
 - Sintoma/Motivo relatado pelo cliente: ${data.sintoma || 'Não informado'}
 - Tempo decorrido: ${data.tempo || 'Atendimento recente'}
-- Orientação/Dica de saúde específica: ${data.dica || 'Recomendações gerais de saúde e adesão ao tratamento'}
+- Orientação/Dica de saúde específica: ${data.dica || 'Recomendações gerais de saúde e adesão ao tratamento'}${campaignPromptInstruction}
 
 REGRAS OBRIGATÓRIAS:
 1. Tom estritamente humanizado, acolhedor, ético e farmacêutico.
@@ -2644,6 +3044,7 @@ JSON EXATO:
     id: Date.now(),
     timestamp: new Date().toLocaleString('pt-BR'),
     clientData: data,
+    campaign: activeCampaign,
     isAI: true,
     versions: versionsWithAntiSpam
   };
@@ -2871,12 +3272,14 @@ function renderGeneratedOutput(genData) {
   const { id, clientData, versions } = genData;
   const rawPhone = String(clientData.telefone || '').replace(/[^\d]/g, '');
   const cleanPhone = rawPhone ? (rawPhone.length === 11 || rawPhone.length === 10 ? '55' + rawPhone : rawPhone) : '';
+  const campaignObj = clientData.campaign || genData.campaign;
 
   const cardHTML = `
     <div class="message-card" id="card-${id}">
       <div class="card-header">
         <div class="card-meta">
           ${genData.isAI ? `<span class="meta-pill" style="background: rgba(0, 255, 204, 0.15); color: #00ffcc; border: 1px solid #00ffcc;">🤖 Gemini IA</span>` : ''}
+          ${campaignObj ? `<span class="meta-pill pill-campaign">📢 Campanha: <strong>${escapeHTML(campaignObj.name)}</strong></span>` : ''}
           <span class="meta-pill">👤 Cliente: <strong>${escapeHTML(clientData.nome)}</strong></span>
           <span class="meta-pill">${clientData.classification.icon} ${escapeHTML(clientData.classification.label)}: <strong>${escapeHTML(clientData.medicamento)}</strong></span>
           <span class="meta-pill">🏬 Drogaria: <strong>${escapeHTML(clientData.drogaria)}</strong></span>
@@ -2998,6 +3401,23 @@ function copyMessageText(id) {
  * Renderiza o Formulário Guiado (Wizard Interativo dentro do Terminal)
  */
 function startWizard(defaultNome = '', defaultMed = '') {
+  const campActive = isCampaignActive();
+  const camp = getActiveCampaign();
+  const campaignBoxHTML = campActive ? `
+    <div class="wizard-campaign-section">
+      <label class="wizard-campaign-label" title="Incluir convite da campanha nesta mensagem">
+        <input type="checkbox" id="wizIncludeCampaign" checked>
+        <span>📢 <strong>Campanha Ativa:</strong> ${escapeHTML(camp.name)} <em>(${escapeHTML(camp.period)})</em></span>
+      </label>
+      <button type="button" class="tool-btn" onclick="openCampaignModal()" style="font-size: 0.74rem; padding: 2px 8px;">⚙️ Ajustar</button>
+    </div>
+  ` : `
+    <div class="wizard-campaign-section" style="opacity: 0.85;">
+      <span class="log-dim" style="font-size: 0.78rem;">🎯 Nenhuma campanha de saúde ativa no momento.</span>
+      <button type="button" class="tool-btn" onclick="openCampaignModal()" style="font-size: 0.74rem; padding: 2px 8px;">+ Ativar Campanha</button>
+    </div>
+  `;
+
   const wizardHTML = `
     <div class="wizard-box" id="wizardBox">
       <div class="wizard-title">
@@ -3057,6 +3477,8 @@ function startWizard(defaultNome = '', defaultMed = '') {
           <input type="text" id="wizDica" placeholder="Ex: Manter repouso / Beber água / Fazer compressa fria no local">
         </div>
 
+        ${campaignBoxHTML}
+
         <div class="form-actions">
           <button type="submit" class="tool-btn primary">✨ Gerar Mensagem Humanizada</button>
           <button type="button" class="tool-btn danger" onclick="cancelWizard()">Cancelar</button>
@@ -3091,11 +3513,12 @@ async function handleWizardSubmit(e) {
   const tempo = document.getElementById('wizTempo').value;
   const sintoma = document.getElementById('wizSintoma').value;
   const dica = document.getElementById('wizDica').value;
+  const includeCampaign = document.getElementById('wizIncludeCampaign') ? document.getElementById('wizIncludeCampaign').checked : false;
 
   const wiz = document.getElementById('wizardBox');
   if (wiz) wiz.remove();
 
-  const result = await generateMessagesSmart({ nome, medicamento, tipoOverride, drogaria, farmaceutico, telefone, tempo, sintoma, dica });
+  const result = await generateMessagesSmart({ nome, medicamento, tipoOverride, drogaria, farmaceutico, telefone, tempo, sintoma, dica, includeCampaign });
 
   const badgeStr = result.clientData.classification.icon + ' ' + result.clientData.classification.label;
   appendLog(`✨ Mensagem gerada [${badgeStr}] para <strong>${escapeHTML(nome)}</strong> (${escapeHTML(medicamento)})!`, 'log-success');
@@ -3220,6 +3643,8 @@ function generateUniqueAntiSpamMessage(itemData, indexInBatch) {
   const tempo = itemData.tempo || '';
   const sintoma = itemData.sintoma || '';
   const classification = classifyItem(item, itemData.tipoOverride || 'auto');
+  const activeCampaign = (itemData.includeCampaign !== false && typeof isCampaignActive === 'function' && isCampaignActive()) ? (typeof getActiveCampaign === 'function' ? getActiveCampaign() : null) : null;
+  const campaignBlock = (activeCampaign && typeof formatCampaignMessageBlock === 'function') ? formatCampaignMessageBlock(activeCampaign, drogaria) : '';
 
   let attempts = 0;
   let finalMessage = '';
@@ -3251,7 +3676,7 @@ function generateUniqueAntiSpamMessage(itemData, indexInBatch) {
     // Caractere invisível Zero-Width Space (\u200B) para diferenciar o rastro de bytes de cada envio no WhatsApp
     const zeroWidthPadding = '\u200B'.repeat((indexInBatch + 1) % 5 + 1);
 
-    finalMessage = `${saudacaoStr}\n\n${apresStr}\n\n${perguntaStr}\n\n${suporteStr}\n\n${despedidaStr}${zeroWidthPadding}`;
+    finalMessage = `${saudacaoStr}\n\n${apresStr}\n\n${perguntaStr}\n\n${suporteStr}${campaignBlock}\n\n${despedidaStr}${zeroWidthPadding}`;
     uniqueHash = simpleStringHash(finalMessage);
 
     if (!usedMessageHashes.has(uniqueHash)) {
@@ -3269,8 +3694,10 @@ function generateUniqueAntiSpamMessage(itemData, indexInBatch) {
       drogaria,
       farmaceutico,
       telefone: itemData.telefone ? itemData.telefone.replace(/\D/g, '') : '',
-      classification
+      classification,
+      campaign: activeCampaign
     },
+    campaign: activeCampaign,
     messageText: finalMessage,
     hashSignature: uniqueHash
   };
@@ -3400,12 +3827,13 @@ function sanitizeGeminiBatchJsonResponse(rawText, expectedCount, startIndex = 0)
 async function generateBatchMessagesAI(items, options = {}) {
   if (!Array.isArray(items) || items.length === 0) return [];
 
-  const drogaria = options.drogaria || DEFAULT_CONFIG.drogaria;
   const farmaceutico = options.farmaceutico || DEFAULT_CONFIG.farmaceutico;
+  const drogaria = options.drogaria || DEFAULT_CONFIG.drogaria;
   const tom = options.tom || 'equilibrado';
   const customInstruction = (options.customInstruction || options.customPrompt || '').trim();
+  const activeCampaign = (options.includeCampaign !== false && typeof isCampaignActive === 'function' && isCampaignActive()) ? (typeof getActiveCampaign === 'function' ? getActiveCampaign() : null) : null;
 
-  let tomGuidance = 'Tom equilibrado, profissional e humanizado (padrão de atenção farmacêutica de excelência).';
+  let tomGuidance = 'Tom de voz empático, atencioso, acolhedor e humanizado.';
   if (tom === 'empatico') {
     tomGuidance = 'Tom estritamente empático, acolhedor e humanizado. Priorize o bem-estar e o alívio de eventuais desconfortos.';
   } else if (tom === 'atencioso') {
@@ -3419,6 +3847,10 @@ async function generateBatchMessagesAI(items, options = {}) {
   const extraInstructionPrompt = customInstruction 
     ? `\n6. DIRETRIZ EXTRA DO FARMACÊUTICO RESPONSÁVEL: "${customInstruction}". Aplique de forma natural nas mensagens onde for pertinente.`
     : '';
+
+  const campaignBatchGuidance = activeCampaign ? `
+7. CAMPANHA DE SAÚDE 100% GRATUITA NA FARMÁCIA: "${activeCampaign.name}" (${activeCampaign.period}). Serviços 100% Gratuitos: ${activeCampaign.services.join(', ')}. Chamada: "${activeCampaign.highlightText}".
+DIRETRIZ DE CAMPANHA IA: Destaque de forma acolhedora e calorosa nas mensagens um convite para os clientes aproveitarem esta ação de saúde 100% gratuita (sem qualquer custo) na drogaria.` : '';
 
   const CHUNK_SIZE = 8;
   const results = [];
@@ -3449,7 +3881,7 @@ REGRAS OBRIGATÓRIAS ANTI-SPAM E CLÍNICAS:
 2. WhatsApp Safe / Anti-Spam: NENHUMA mensagem pode ser idêntica a outra. Alterne saudações, construções de frases, perguntas sobre o bem-estar e despedidas acolhedoras.
 3. Formatação WhatsApp: use quebras de linha limpas, negrito (*palavra*) onde necessário e emojis adequados com moderação.
 4. Responda ESTRITAMENTE em formato JSON (Array de objetos) sem explicações ou markdown fora do JSON.
-5. Cada item do array deve ter exatamente as propriedades: "index" (número do cliente), "nome" (nome do cliente) e "mensagem" (texto completo da mensagem para o WhatsApp).${extraInstructionPrompt}
+5. Cada item do array deve ter exatamente as propriedades: "index" (número do cliente), "nome" (nome do cliente) e "mensagem" (texto completo da mensagem para o WhatsApp).${extraInstructionPrompt}${campaignBatchGuidance}
 
 CLIENTES PARA PROCESSAR:
 ${clientsDescription}
@@ -3498,15 +3930,17 @@ FORMATO JSON EXATO:
             sintoma: itemData.sintoma || '',
             tempo: itemData.tempo || '',
             dica: itemData.dica || '',
-            classification
+            classification,
+            campaign: activeCampaign
           },
+          campaign: activeCampaign,
           messageText: finalMessage,
           hashSignature: uniqueHash,
           isAI: true,
           tom: tom
         });
       } else {
-        const fallbackItem = generateUniqueAntiSpamMessage(itemData, globalIdx);
+        const fallbackItem = generateUniqueAntiSpamMessage({ ...itemData, includeCampaign: options.includeCampaign }, globalIdx);
         fallbackItem.isAI = false;
         results.push(fallbackItem);
       }
@@ -3639,6 +4073,17 @@ function startBatchWizard() {
           <textarea id="batchInputText" rows="7" placeholder="Exemplos:&#10;Maria Silva | Amoxicilina 500mg | 11988887777 | dor de garganta&#10;Carlos Souza | Aferição de Pressão | 11977776666&#10;Ana Paula | Aplicação de Voltaren | 11966665555 | dor nas costas&#10;Roberto Lima | Losartana 50mg | 11955554444" required></textarea>
         </div>
 
+        ${isCampaignActive() ? `
+        <div class="form-group" style="margin-bottom: 12px; padding: 10px 12px; background: rgba(0, 255, 102, 0.08); border: 1px solid rgba(0, 255, 102, 0.3); border-radius: 6px;">
+          <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; color: #00ff66; font-weight: 600; margin: 0;">
+            <input type="checkbox" id="batchIncludeCampaignCheckbox" checked style="accent-color: #00ff66; width: 16px; height: 16px;">
+            <span>📢 Incluir Ação de Saúde 100% Gratuita: <strong>${escapeHTML(getActiveCampaign().name)}</strong></span>
+          </label>
+          <div style="font-size: 0.76rem; color: var(--text-dim); margin-top: 4px; padding-left: 24px;">
+            ✨ Destaca serviços 100% gratuitos (${escapeHTML(getActiveCampaign().services.join(', '))}) em cada mensagem personalizada gerada no lote.
+          </div>
+        </div>` : ''}
+
         <div class="form-actions">
           <button type="submit" id="batchSubmitBtn" class="tool-btn primary" style="background: var(--warning-color); color: #000;">🚀 Gerar Mensagens em Lote (WhatsApp Safe)</button>
           <button type="button" class="tool-btn danger" onclick="cancelWizard()">Cancelar</button>
@@ -3735,6 +4180,8 @@ async function handleBatchSubmit(e) {
   const tom = tomSelect ? tomSelect.value : 'equilibrado';
   const customInstructionInput = document.getElementById('batchCustomInstruction');
   const customInstruction = customInstructionInput ? customInstructionInput.value.trim() : '';
+  const includeCampaignCheckbox = document.getElementById('batchIncludeCampaignCheckbox');
+  const includeCampaign = includeCampaignCheckbox ? includeCampaignCheckbox.checked : true;
 
   const submitBtn = document.getElementById('batchSubmitBtn');
   if (submitBtn) {
@@ -3745,12 +4192,12 @@ async function handleBatchSubmit(e) {
   const wiz = document.getElementById('wizardBox');
   if (wiz) wiz.remove();
 
-  const generatedBatch = await generateBatchMessagesSmart(items, { useAI, tom, customInstruction });
+  const generatedBatch = await generateBatchMessagesSmart(items, { useAI, tom, customInstruction, includeCampaign });
 
   const aiCount = generatedBatch.filter(b => b.isAI).length;
   const badgeInfo = aiCount > 0 ? `com <strong>IA Gemini</strong> (${aiCount}/${generatedBatch.length})` : `com motor anti-spam local`;
   appendLog(`🚀 Lote de <strong>${generatedBatch.length}</strong> mensagem(ns) única(s) ${badgeInfo} gerado com sucesso!`, 'log-success');
-  renderBatchOutput(generatedBatch, { tom, customInstruction });
+  renderBatchOutput(generatedBatch, { tom, customInstruction, includeCampaign });
 }
 
 window.batchMessagesStore = window.batchMessagesStore || {};
@@ -4460,6 +4907,14 @@ async function executeCommand(inputCmd) {
       startBatchWizard();
       break;
 
+    case 'campanha':
+    case 'campanhas':
+    case 'campaign':
+    case 'promocao':
+    case 'promo':
+      openCampaignModal();
+      break;
+
     case 'servicos':
     case 'servico':
     case 'serviços':
@@ -4811,6 +5266,7 @@ function showHelp() {
       <div style="display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 16px;">
         <button class="tool-btn primary" onclick="startWizard()">✨ Nova Mensagem (Individual)</button>
         <button class="tool-btn primary" style="background: var(--warning-color); color: #000;" onclick="startBatchWizard()">📦 Lote Anti-Spam (Múltiplos)</button>
+        <button class="tool-btn" style="background: rgba(0, 255, 102, 0.15); border-color: #00ff66; color: #00ff66;" onclick="openCampaignModal()">📢 Campanhas de Saúde (Gratuitas)</button>
         <button class="tool-btn" onclick="showServicesHelp()">🩺 Serviços Farmacêuticos Suportados</button>
         <button class="tool-btn" onclick="showAbout()">ℹ️ Sobre o Sistema</button>
         <button class="tool-btn" onclick="showHistory()">📜 Ver Histórico</button>
@@ -4836,6 +5292,11 @@ function showHelp() {
             <td><code>lote</code> / <code>massa</code> / <code>batch</code></td>
             <td>Gera e dispara mensagens em lote no WhatsApp com Gemini IA.</td>
             <td><code>lote</code></td>
+          </tr>
+          <tr>
+            <td><code>campanha</code> / <code>campanhas</code></td>
+            <td>Gerencia e ativa campanhas de saúde 100% gratuitas (Glicemia, Pressão, Bioimpedância).</td>
+            <td><code>campanha</code></td>
           </tr>
           <tr>
             <td><code>servicos</code> / <code>serviço</code></td>
