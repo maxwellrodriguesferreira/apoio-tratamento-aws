@@ -1961,6 +1961,7 @@ async function initializeAuth() {
 
 // Inicialização principal da aplicação
 function startMainApp() {
+  resolveDOMElements();
   renderWelcomeBanner();
   updateHistoryCounter();
   updateAIStatus();
@@ -2189,8 +2190,8 @@ function saveActiveCampaign(campaign) {
   } catch (e) {
     console.error('Erro ao persistir campanha:', e);
   }
-  updateCampaignUIStatus();
-  renderCampaignActiveBanner();
+  if (typeof updateCampaignUIStatus === 'function') updateCampaignUIStatus();
+  if (typeof renderCampaignActiveBanner === 'function') renderCampaignActiveBanner();
 }
 
 function isCampaignActive() {
@@ -2337,6 +2338,10 @@ function closeCampaignModal() {
 }
 
 function toggleCampaignActive(isChecked) {
+  const camp = getActiveCampaign();
+  camp.enabled = Boolean(isChecked);
+  saveActiveCampaign(camp);
+
   const statusBox = document.getElementById('campaignStatusBox');
   const statusDot = document.getElementById('campaignStatusDot');
   const statusLabel = document.getElementById('campaignStatusLabel');
@@ -2349,6 +2354,7 @@ function toggleCampaignActive(isChecked) {
     ? 'As mensagens geradas incluirão automaticamente o convite desta campanha.' 
     : 'Nenhuma informação de campanha será incluída nas mensagens.';
 
+  updateCampaignUIStatus();
   updateCampaignPreview();
 }
 
@@ -2436,7 +2442,6 @@ function updateCampaignPreview() {
 
 function handleSaveCampaign(e) {
   if (e) e.preventDefault();
-  const isEnabled = document.getElementById('campaignToggleSwitch')?.checked;
   const name = document.getElementById('campaignNameInput')?.value.trim();
   const period = document.getElementById('campaignPeriodInput')?.value.trim();
   const icon = document.getElementById('campaignIconSelect')?.value || '🩺';
@@ -2456,7 +2461,7 @@ function handleSaveCampaign(e) {
   const presetId = activePresetBtn ? activePresetBtn.dataset.preset : 'custom';
 
   const updatedCamp = {
-    enabled: Boolean(isEnabled),
+    enabled: true,
     id: presetId,
     name,
     period: period || 'nesta semana',
@@ -2468,22 +2473,22 @@ function handleSaveCampaign(e) {
 
   saveActiveCampaign(updatedCamp);
 
+  const toggleSwitch = document.getElementById('campaignToggleSwitch');
+  if (toggleSwitch) toggleSwitch.checked = true;
+  toggleCampaignActive(true);
+
   const feedback = document.getElementById('campaignFeedback');
   if (feedback) {
     feedback.className = 'login-feedback is-success';
-    feedback.textContent = isEnabled ? '🎉 Campanha salva e ativada com sucesso!' : '✅ Configurações salvas (Campanha desativada).';
+    feedback.textContent = '🎉 Campanha salva e ativada com sucesso!';
   }
 
-  if (isEnabled) {
-    appendLog(`🎯 <strong>Campanha Ativada:</strong> <strong>${escapeHTML(name)}</strong> (${escapeHTML(services.join(', '))}) agora será incluída nas mensagens!`, 'log-success');
-  } else {
-    appendLog(`ℹ️ Campanha de saúde foi <strong>desativada</strong>.`, 'log-info');
-  }
+  appendLog(`🎯 <strong>Campanha Ativada:</strong> <strong>${escapeHTML(name)}</strong> (${escapeHTML((services.length > 0 ? services : ['Serviços Gratuitos']).join(', '))}) agora será incluída nas mensagens!`, 'log-success');
 
   setTimeout(() => {
     closeCampaignModal();
     if (feedback) feedback.textContent = '';
-  }, 350);
+  }, 400);
 }
 
 function deactivateCampaign() {
@@ -3522,131 +3527,10 @@ function copyMessageText(id) {
   copyTextToClipboard(textToCopy, '✅ Mensagem copiada com sucesso para a área de transferência!');
 }
 /**
- * Renderiza o Formulário Guiado (Wizard Interativo dentro do Terminal)
+ * Redireciona para o Gerador de Mensagens em Lote Inteligente (Fluxo Único do Sistema)
  */
 function startWizard(defaultNome = '', defaultMed = '') {
-  const campActive = isCampaignActive();
-  const camp = getActiveCampaign();
-  const campaignBoxHTML = campActive ? `
-    <div class="wizard-campaign-section">
-      <label class="wizard-campaign-label" title="Incluir convite da campanha nesta mensagem">
-        <input type="checkbox" id="wizIncludeCampaign" checked>
-        <span>📢 <strong>Campanha Ativa:</strong> ${escapeHTML(camp.name)} <em>(${escapeHTML(camp.period)})</em></span>
-      </label>
-      <button type="button" class="tool-btn" onclick="openCampaignModal()" style="font-size: 0.74rem; padding: 2px 8px;">⚙️ Ajustar</button>
-    </div>
-  ` : `
-    <div class="wizard-campaign-section" style="opacity: 0.85;">
-      <span class="log-dim" style="font-size: 0.78rem;">🎯 Nenhuma campanha de saúde ativa no momento.</span>
-      <button type="button" class="tool-btn" onclick="openCampaignModal()" style="font-size: 0.74rem; padding: 2px 8px;">+ Ativar Campanha</button>
-    </div>
-  `;
-
-  const wizardHTML = `
-    <div class="wizard-box" id="wizardBox">
-      <div class="wizard-title">
-        <span>📋 Formular Mensagem de Apoio ao Tratamento / Serviço</span>
-      </div>
-      <form id="wizardForm" onsubmit="handleWizardSubmit(event)">
-        <div class="form-row">
-          <div class="form-group">
-            <label>👤 Nome do Cliente *</label>
-            <input type="text" id="wizNome" value="${escapeHTML(defaultNome)}" placeholder="Ex: Maria Silva" required autofocus>
-          </div>
-          <div class="form-group">
-            <label>💊 Medicamento ou 🩺 Serviço Farmacêutico *</label>
-            <input type="text" id="wizMedicamento" value="${escapeHTML(defaultMed)}" placeholder="Ex: Amoxicilina 500mg, Aplicação de Injetável, Pressão Arterial, Glicemia..." required>
-          </div>
-        </div>
-
-        <div class="form-row">
-          <div class="form-group">
-            <label>🏷️ Tipo de Atendimento (Classificação)</label>
-            <select id="wizTipoOverride">
-              <option value="auto">🤖 Identificar Automatizado (Recomendado)</option>
-              <option value="medicamento">💊 Medicamento (Uso contínuo ou temporário)</option>
-              <option value="servico">🩺 Serviço Farmacêutico (Injetáveis, Pressão, Glicemia, etc.)</option>
-            </select>
-          </div>
-          <div class="form-group">
-            <label>📱 WhatsApp do Cliente (Opcional)</label>
-            <input type="tel" id="wizTelefone" placeholder="Ex: 11999998888">
-          </div>
-        </div>
-
-        <div class="form-row">
-          <div class="form-group">
-            <label>🏬 Nome da Drogaria</label>
-            <input type="text" id="wizDrogaria" value="${escapeHTML(DEFAULT_CONFIG.drogaria)}">
-          </div>
-          <div class="form-group">
-            <label>👨⚕️ Nome do Farmacêutico</label>
-            <input type="text" id="wizFarmaceutico" value="${escapeHTML(DEFAULT_CONFIG.farmaceutico)}">
-          </div>
-        </div>
-
-        <div class="form-row">
-          <div class="form-group">
-            <label>⏱️ Tempo / Momento do Atendimento (Opcional)</label>
-            <input type="text" id="wizTempo" placeholder="Ex: há 3 dias / hoje pela manhã">
-          </div>
-          <div class="form-group">
-            <label>🤒 Sintoma / Motivo (Opcional)</label>
-            <input type="text" id="wizSintoma" placeholder="Ex: tontura / dor de cabeça / dor de garganta">
-          </div>
-        </div>
-
-        <div class="form-group">
-          <label>💡 Dica ou Recomendação Especial (Opcional)</label>
-          <input type="text" id="wizDica" placeholder="Ex: Manter repouso / Beber água / Fazer compressa fria no local">
-        </div>
-
-        ${campaignBoxHTML}
-
-        <div class="form-actions">
-          <button type="submit" class="tool-btn primary">✨ Gerar Mensagem Humanizada</button>
-          <button type="button" class="tool-btn danger" onclick="cancelWizard()">Cancelar</button>
-        </div>
-      </form>
-    </div>
-  `;
-
-  const oldWiz = document.getElementById('wizardBox');
-  if (oldWiz) oldWiz.remove();
-
-  const container = document.createElement('div');
-  container.innerHTML = wizardHTML;
-  terminalOutput.appendChild(container);
-
-  setTimeout(() => {
-    const inputNome = document.getElementById('wizNome');
-    if (inputNome) inputNome.focus();
-  }, 100);
-
-  scrollToBottom();
-}
-
-async function handleWizardSubmit(e) {
-  e.preventDefault();
-  const nome = document.getElementById('wizNome').value;
-  const medicamento = document.getElementById('wizMedicamento').value;
-  const tipoOverride = document.getElementById('wizTipoOverride').value;
-  const drogaria = document.getElementById('wizDrogaria').value;
-  const farmaceutico = document.getElementById('wizFarmaceutico').value;
-  const telefone = document.getElementById('wizTelefone').value;
-  const tempo = document.getElementById('wizTempo').value;
-  const sintoma = document.getElementById('wizSintoma').value;
-  const dica = document.getElementById('wizDica').value;
-  const includeCampaign = document.getElementById('wizIncludeCampaign') ? document.getElementById('wizIncludeCampaign').checked : false;
-
-  const wiz = document.getElementById('wizardBox');
-  if (wiz) wiz.remove();
-
-  const result = await generateMessagesSmart({ nome, medicamento, tipoOverride, drogaria, farmaceutico, telefone, tempo, sintoma, dica, includeCampaign });
-
-  const badgeStr = result.clientData.classification.icon + ' ' + result.clientData.classification.label;
-  appendLog(`✨ Mensagem gerada [${badgeStr}] para <strong>${escapeHTML(nome)}</strong> (${escapeHTML(medicamento)})!`, 'log-success');
-  renderGeneratedOutput(result);
+  startBatchWizard();
 }
 
 function cancelWizard() {
@@ -4997,40 +4881,10 @@ async function executeCommand(inputCmd) {
     case 'criar':
     case 'iniciar':
     case 'guiado':
-      if (parts.flags && (parts.flags.cliente || parts.flags.remedio || parts.flags.nome || parts.flags.medicamento)) {
-        const nome = parts.flags.cliente || parts.flags.nome;
-        const medicamento = parts.flags.remedio || parts.flags.medicamento;
-        const result = await generateMessagesSmart({
-          nome: nome || 'Cliente',
-          medicamento: medicamento || 'Medicamento',
-          drogaria: parts.flags.drogaria || DEFAULT_CONFIG.drogaria,
-          farmaceutico: parts.flags.farmaceutico || DEFAULT_CONFIG.farmaceutico,
-          telefone: parts.flags.telefone || '',
-          sintoma: parts.flags.sintoma || '',
-          tempo: parts.flags.tempo || '',
-          dica: parts.flags.dica || ''
-        });
-        renderGeneratedOutput(result);
-      } else if (parts.length >= 3) {
-        const result = await generateMessagesSmart({
-          nome: parts[1],
-          medicamento: parts[2],
-          drogaria: parts.flags?.drogaria || DEFAULT_CONFIG.drogaria,
-          farmaceutico: parts.flags?.farmaceutico || DEFAULT_CONFIG.farmaceutico,
-          telefone: parts.flags?.telefone || parts[3] || '',
-          sintoma: parts.flags?.sintoma || '',
-          tempo: parts.flags?.tempo || '',
-          dica: parts.flags?.dica || ''
-        });
-        renderGeneratedOutput(result);
-      } else {
-        startWizard();
-      }
-      break;
-
     case 'lote':
     case 'massa':
     case 'batch':
+    case '1':
       startBatchWizard();
       break;
 
@@ -5391,10 +5245,11 @@ function showHelp() {
       </p>
 
       <div style="display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 16px;">
-        <button class="tool-btn primary" onclick="startWizard()">✨ Nova Mensagem (Individual)</button>
-        <button class="tool-btn primary" style="background: var(--warning-color); color: #000;" onclick="startBatchWizard()">📦 Lote Anti-Spam (Múltiplos)</button>
-        <button class="tool-btn" style="background: rgba(0, 255, 102, 0.15); border-color: #00ff66; color: #00ff66;" onclick="openCampaignModal()">📢 Campanhas de Saúde (Gratuitas)</button>
-        <button class="tool-btn" onclick="showServicesHelp()">🩺 Serviços Farmacêuticos Suportados</button>
+        <button class="tool-btn primary" style="background: var(--warning-color); color: #000;" onclick="startBatchWizard()">📦 Gerar Mensagens em Lote (WhatsApp)</button>
+        <button class="tool-btn" style="background: rgba(0, 255, 102, 0.15); border-color: #00ff66; color: #00ff66;" onclick="openCampaignModal()">🎯 Campanhas de Saúde (Gratuitas)</button>
+        <button class="tool-btn" onclick="openUserProfileModal()">👤 Meu Perfil</button>
+        <button class="tool-btn" onclick="openGeminiConfigPanel()">⚙️ Configurações IA</button>
+        <button class="tool-btn" onclick="showServicesHelp()">🩺 Serviços Farmacêuticos</button>
         <button class="tool-btn" onclick="showAbout()">ℹ️ Sobre o Sistema</button>
         <button class="tool-btn" onclick="showHistory()">📜 Ver Histórico</button>
         <button class="tool-btn" onclick="toggleTheme()">🎨 Trocar Tema Visual</button>
@@ -5411,13 +5266,8 @@ function showHelp() {
         </thead>
         <tbody>
           <tr>
-            <td><code>novo</code> / <code>guiado</code></td>
-            <td>Abre o formulário guiado de criação individual.</td>
-            <td><code>novo</code></td>
-          </tr>
-          <tr>
-            <td><code>lote</code> / <code>massa</code> / <code>batch</code></td>
-            <td>Gera e dispara mensagens em lote no WhatsApp com Gemini IA.</td>
+            <td><code>lote</code> / <code>novo</code> / <code>batch</code></td>
+            <td>Gera e dispara mensagens em lote no WhatsApp com Gemini IA e proteção anti-bloqueio.</td>
             <td><code>lote</code></td>
           </tr>
           <tr>

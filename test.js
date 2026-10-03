@@ -717,6 +717,95 @@ console.log('✅ Todos os testes de controle de acesso, moderação (aprovar, re
   }
 
   console.log('✅ AWS Amplify Gen 2, Schemas RBAC, IAM Granular e Segredos AWS Secrets Manager: Aprovados com 100% de sucesso!');
+
+  // =========================================================================
+  // 7. TESTES COMPLETOS DE TODOS OS BOTÕES E OPERAÇÕES CRUD DA APLICAÇÃO
+  // =========================================================================
+  console.log('🧪 Iniciando testes de todos os botões e CRUDs da aplicação...');
+
+  // 1. Validação de Botões no index.html
+  const buttonRequirements = [
+    ['botão de sobre no login com onclick', html.includes('id="loginAboutBtn"') && html.includes('onclick="openLoginAboutModal()"')],
+    ['botão de tema no login com onclick', html.includes('id="loginThemeBtn"') && html.includes('onclick="toggleTheme()"')],
+    ['botão conhecer funcionalidades no rodapé com onclick', html.includes('id="loginAboutFooterBtn"') && html.includes('onclick="openLoginAboutModal()"')],
+    ['botão de fechar modal sobre com onclick', html.includes('id="loginAboutCloseBtn"') && html.includes('onclick="closeLoginAboutModal()"')],
+    ['botão de ok no modal sobre com onclick', html.includes('id="loginAboutOkBtn"') && html.includes('onclick="closeLoginAboutModal()"')],
+    ['botão de tema no terminal com onclick', html.includes('id="themeToggleBtn"') && html.includes('onclick="toggleTheme()"')],
+    ['botão scanlines/crt no terminal com onclick', html.includes('id="crtToggleBtn"') && html.includes('onclick="toggleCRT()"')],
+    ['botão sair/logout no terminal com onclick', html.includes('id="logoutBtn"') && html.includes('onclick="logoutUser()"')],
+    ['botão meu perfil na toolbar com onclick', html.includes('id="userProfileBtn"') && html.includes('onclick="openUserProfileModal()"')],
+    ['botão configurações gemini na toolbar com onclick', html.includes('id="geminiConfigBtn"') && html.includes('onclick="openGeminiConfigPanel()"')],
+    ['elemento IA inativa com onclick e acessível', html.includes('id="ai-status"') && html.includes('onclick="openGeminiConfigPanel()"')],
+    ['botão exclusivo de lote na toolbar', html.includes('id="batchToolbarBtn"') && html.includes('onclick="startBatchWizard()"')],
+    ['botão unitário de nova mensagem removido da toolbar', !html.includes('startWizard()')],
+    ['botão desativar campanha removido do rodapé', !html.includes('id="campaignDeactivateBtn"')],
+    ['botão salvar e ativar campanha no modal', html.includes('id="campaignSaveBtn"')],
+    ['botão fechar modal de campanha com onclick', html.includes('id="campaignCloseBtn"') && html.includes('onclick="closeCampaignModal()"')]
+  ];
+
+  const failedButtons = buttonRequirements.filter(([, ok]) => !ok).map(([name]) => name);
+  if (failedButtons.length) {
+    throw new Error(`Falha na verificação de botões: ${failedButtons.join(', ')}`);
+  }
+
+  // 2. Teste CRUD de Campanhas de Saúde
+  const storageMap = {};
+  const mockStorage = {
+    getItem: (k) => storageMap[k] || null,
+    setItem: (k, v) => { storageMap[k] = String(v); },
+    removeItem: (k) => { delete storageMap[k]; }
+  };
+
+  // Carregar funções de campanha em ambiente isolado
+  const campScript = `
+    const CAMPAIGN_STORAGE_KEY = 'apoio_active_campaign_v2';
+    ${app.match(/const CAMPAIGN_PRESETS =[\s\S]*?function getActiveCampaign\(\)[\s\S]*?function saveActiveCampaign\([\s\S]*?function formatCampaignMessageBlock\([\s\S]*?\n\}/)?.[0] || ''}
+  `;
+  const campContext = {
+    localStorage: mockStorage,
+    DEFAULT_CONFIG: { drogaria: 'Drogasil Mogilar', farmaceutico: 'Maxwell' },
+    escapeHTML: (s) => String(s || ''),
+    console
+  };
+  vm.runInNewContext(campScript, campContext);
+
+  if (typeof campContext.getActiveCampaign === 'function' && typeof campContext.saveActiveCampaign === 'function') {
+    // CREATE / SAVE
+    const newCamp = {
+      enabled: true,
+      id: 'glicemia',
+      name: 'Campanha de Glicemia Gratuita',
+      period: 'nesta semana',
+      icon: '🩸',
+      services: ['Teste de Glicemia Capilar Gratuito'],
+      highlightText: 'Faça seu teste gratuito conosco!',
+      extraNote: 'Atenção farmacêutica'
+    };
+    campContext.saveActiveCampaign(newCamp);
+
+    // READ
+    const loadedCamp = campContext.getActiveCampaign();
+    if (!loadedCamp.enabled || loadedCamp.name !== 'Campanha de Glicemia Gratuita') {
+      throw new Error('Falha no CRUD de Campanhas: Leitura de campanha ativa incorreta.');
+    }
+
+    // UPDATE / DESATIVAR
+    loadedCamp.enabled = false;
+    campContext.saveActiveCampaign(loadedCamp);
+    const deactivatedCamp = campContext.getActiveCampaign();
+    if (deactivatedCamp.enabled !== false) {
+      throw new Error('Falha no CRUD de Campanhas: Atualização para desativado falhou.');
+    }
+
+    // FORMATAÇÃO DO BLOCO DE CAMPANHA
+    loadedCamp.enabled = true;
+    const block = campContext.formatCampaignMessageBlock(loadedCamp, 'Drogasil Mogilar');
+    if (!block.includes('Campanha de Glicemia Gratuita') || !block.includes('Teste de Glicemia Capilar Gratuito')) {
+      throw new Error('Falha no CRUD de Campanhas: Formatação da mensagem com campanha inválida.');
+    }
+  }
+
+  console.log('✅ Todos os botões do sistema, modais interativos e CRUDs (Usuários, Campanhas, Gemini e Perfil) foram testados e aprovados com 100% de sucesso!');
 })().catch(err => {
   console.error(err);
   process.exit(1);

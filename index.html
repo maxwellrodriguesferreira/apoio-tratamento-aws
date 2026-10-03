@@ -30,25 +30,24 @@
       <div class="terminal-title">
         <span class="icon">💊🩺</span> <span id="headerTerminalTitle">maxwell@drogasil-mogilar: ~/apoio-tratamento</span>
       </div>
-      <div class="terminal-title" id="ai-status">
+      <div class="terminal-title" id="ai-status" role="button" tabindex="0" onclick="openGeminiConfigPanel()" title="Configurações da IA Google Gemini (Clique para configurar)" style="cursor: pointer;">
         🔴 IA Inativa
       </div>
       <div class="header-actions">
-        <button id="themeToggleBtn" type="button" title="Trocar Tema Visual (Matrix / Amber / Cyberpunk / Dark)">🎨 Tema</button>
-        <button id="crtToggleBtn" type="button" class="active" title="Efeito Tubo CRT">📺 Scanlines</button>
-        <button id="logoutBtn" type="button" class="tool-btn danger" title="Encerrar Sessão">🔒 Sair</button>
+        <button id="themeToggleBtn" type="button" onclick="toggleTheme()" title="Trocar Tema Visual (Matrix / Amber / Cyberpunk / Dark)">🎨 Tema</button>
+        <button id="crtToggleBtn" type="button" class="active" onclick="toggleCRT()" title="Efeito Tubo CRT">📺 Scanlines</button>
+        <button id="logoutBtn" type="button" class="tool-btn danger" onclick="logoutUser()" title="Encerrar Sessão">🔒 Sair</button>
       </div>
     </header>
 
     <!-- Visual Toolbar / Quick Actions -->
     <nav class="quick-toolbar" aria-label="Ações Rápidas">
-      <button class="tool-btn primary" type="button" onclick="startWizard()">✨ Nova Mensagem</button>
-      <button class="tool-btn primary btn-batch-quick" type="button" onclick="startBatchWizard()">📦 Lote WhatsApp</button>
+      <button class="tool-btn primary btn-batch-quick" id="batchToolbarBtn" type="button" onclick="startBatchWizard()" title="Gerador de Mensagens em Lote Inteligente para WhatsApp">📦 Gerar Mensagens em Lote</button>
       <button class="tool-btn btn-campaign-quick" id="campaignToolbarBtn" type="button" onclick="openCampaignModal()" title="Campanhas de Saúde & Atendimentos Gratuitos (Glicemia, Pressão, Bioimpedância)">🎯 Campanhas <span id="campaignToolbarBadge" class="badge-counter badge-campaign" style="display: none;">ATIVA</span></button>
       <button class="tool-btn" type="button" onclick="executeCommand('historico')">📜 Histórico</button>
-      <button class="tool-btn" id="userProfileBtn" type="button" title="Meu Perfil e Redefinição de Credenciais">👤 Meu Perfil</button>
-      <button class="tool-btn" id="geminiConfigBtn" type="button">⚙️ Configurações</button>
-      <button class="tool-btn" id="adminUsersBtn" type="button" style="display: none;" title="Painel de Controle de Usuários (/admin/users)">👥 Painel Admin <span id="pendingUsersBadge" class="badge-counter" style="display: none;">0</span></button>
+      <button class="tool-btn" id="userProfileBtn" type="button" onclick="openUserProfileModal()" title="Meu Perfil e Redefinição de Credenciais">👤 Meu Perfil</button>
+      <button class="tool-btn" id="geminiConfigBtn" type="button" onclick="openGeminiConfigPanel()" title="Configurações da IA Google Gemini">⚙️ Configurações</button>
+      <button class="tool-btn" id="adminUsersBtn" type="button" onclick="openAdminUsersPanel()" style="display: none;" title="Painel de Controle de Usuários (/admin/users)">👥 Painel Admin <span id="pendingUsersBadge" class="badge-counter" style="display: none;">0</span></button>
       <button class="tool-btn danger" type="button" onclick="executeCommand('limpar')">🧹 Limpar</button>
     </nav>
 
@@ -86,8 +85,8 @@
         </div>
         <span class="login-badge" id="loginBadge">🔒 ACESSO RESTRITO</span>
         <div class="login-header-actions">
-          <button id="loginAboutBtn" type="button" class="login-header-btn" title="Sobre o Projeto & Criador">ℹ️ Sobre</button>
-          <button id="loginThemeBtn" type="button" class="login-header-btn" title="Trocar Tema Visual">🎨 Tema</button>
+          <button id="loginAboutBtn" type="button" class="login-header-btn" onclick="openLoginAboutModal()" title="Sobre o Projeto & Criador">ℹ️ Sobre</button>
+          <button id="loginThemeBtn" type="button" class="login-header-btn" onclick="toggleTheme()" title="Trocar Tema Visual">🎨 Tema</button>
         </div>
       </div>
 
@@ -216,14 +215,14 @@
 
       <footer class="login-creator-credits">
         <div>👨‍⚕️💻 Criado pelo desenvolvedor e farmacêutico <strong>Maxwell Rodrigues Ferreira</strong> &bull; <strong>CRF-SP nº 86426</strong></div>
-        <button type="button" id="loginAboutFooterBtn" class="login-about-link-btn" title="Conhecer detalhes do projeto e criador">📖 Conhecer funcionalidades do sistema</button>
+        <button type="button" id="loginAboutFooterBtn" class="login-about-link-btn" onclick="openLoginAboutModal()" title="Conhecer detalhes do projeto e criador">📖 Conhecer funcionalidades do sistema</button>
       </footer>
     </div>
   </section>
 
   <!-- Modal Sobre o Projeto & Criador (Acessível na tela de login e terminal) -->
   <div class="admin-modal" id="loginAboutModal" hidden>
-    <div class="admin-modal-backdrop" id="loginAboutBackdrop"></div>
+    <div class="admin-modal-backdrop" id="loginAboutBackdrop" onclick="closeLoginAboutModal()"></div>
     <div class="admin-modal-card login-about-card" role="dialog" aria-modal="true" aria-labelledby="loginAboutModalTitle">
       <div class="admin-modal-header">
         <div style="display: flex; align-items: center; gap: 8px;">
@@ -233,7 +232,7 @@
             <span class="badge-tag" style="margin-top: 2px; display: inline-block;">Versão 3.3.0 · PWA Clínico</span>
           </div>
         </div>
-        <button class="gemini-icon-button" id="loginAboutCloseBtn" type="button" aria-label="Fechar modal de informações">✕</button>
+        <button class="gemini-icon-button" id="loginAboutCloseBtn" type="button" onclick="closeLoginAboutModal()" aria-label="Fechar modal de informações">✕</button>
       </div>
 
       <div class="admin-modal-body" style="line-height: 1.6; font-size: 0.88rem; max-height: calc(85vh - 120px); overflow-y: auto; padding-right: 6px;">
@@ -312,14 +311,14 @@
       </div>
 
       <div class="admin-modal-actions" style="margin-top: 16px; justify-content: flex-end;">
-        <button class="tool-btn primary" id="loginAboutOkBtn" type="button">Entendi / Fechar</button>
+        <button class="tool-btn primary" id="loginAboutOkBtn" type="button" onclick="closeLoginAboutModal()">Entendi / Fechar</button>
       </div>
     </div>
   </div>
 
   <!-- Painel Administrativo de Gestão de Usuários (/admin/users) -->
   <section class="admin-users-panel" id="adminUsersPanel" aria-labelledby="adminUsersTitle" hidden>
-    <div class="admin-users-backdrop" data-admin-close></div>
+    <div class="admin-users-backdrop" data-admin-close onclick="closeAdminUsersPanel()"></div>
     <div class="admin-users-card" role="dialog" aria-modal="true" aria-labelledby="adminUsersTitle">
       <div class="admin-users-header">
         <div>
@@ -327,7 +326,7 @@
           <h2 id="adminUsersTitle">👥 Gestão e Aprovação de Usuários</h2>
           <p class="admin-users-subtitle">Gerencie permissões (roles), aprove ou recuse novos cadastros e controle bloqueios de acesso.</p>
         </div>
-        <button class="gemini-icon-button" id="adminUsersCloseBtn" type="button" aria-label="Fechar painel administrativo">✕</button>
+        <button class="gemini-icon-button" id="adminUsersCloseBtn" type="button" onclick="closeAdminUsersPanel()" aria-label="Fechar painel administrativo">✕</button>
       </div>
 
       <!-- Estatísticas / Contadores -->
@@ -414,7 +413,7 @@
 
   <!-- Modal Meu Perfil & Redefinição de Credenciais -->
   <section class="admin-users-panel" id="userProfilePanel" aria-labelledby="userProfileTitle" hidden>
-    <div class="admin-users-backdrop" id="userProfileBackdrop"></div>
+    <div class="admin-users-backdrop" id="userProfileBackdrop" onclick="closeUserProfileModal()"></div>
     <div class="admin-users-card user-profile-card" role="dialog" aria-modal="true" aria-labelledby="userProfileTitle" style="max-width: 580px;">
       <div class="admin-users-header">
         <div>
@@ -422,7 +421,7 @@
           <h2 id="userProfileTitle">Meu Perfil & Redefinição de Senha</h2>
           <p class="admin-users-subtitle">Gerencie suas informações cadastrais e atualize sua senha com segurança.</p>
         </div>
-        <button class="gemini-icon-button" id="userProfileCloseBtn" type="button" aria-label="Fechar meu perfil">✕</button>
+        <button class="gemini-icon-button" id="userProfileCloseBtn" type="button" onclick="closeUserProfileModal()" aria-label="Fechar meu perfil">✕</button>
       </div>
 
       <!-- Resumo da Conta Autenticada -->
@@ -440,10 +439,10 @@
 
       <!-- Abas Internas do Perfil -->
       <div class="auth-tabs" style="margin-bottom: 16px;">
-        <button type="button" class="auth-tab-btn active" id="tabProfilePassBtn">
+        <button type="button" class="auth-tab-btn active" id="tabProfilePassBtn" onclick="switchProfileTab('pass')">
           🔑 Alterar Senha
         </button>
-        <button type="button" class="auth-tab-btn" id="tabProfileDataBtn">
+        <button type="button" class="auth-tab-btn" id="tabProfileDataBtn" onclick="switchProfileTab('data')">
           📝 Dados Cadastrais
         </button>
       </div>
@@ -483,7 +482,7 @@
         <div class="login-feedback" id="profilePassFeedback" role="alert" aria-live="polite"></div>
 
         <div class="admin-modal-actions" style="margin-top: 14px; display: flex; justify-content: flex-end; gap: 8px;">
-          <button class="tool-btn" type="button" id="profilePassCancelBtn">Fechar</button>
+          <button class="tool-btn" type="button" id="profilePassCancelBtn" onclick="closeUserProfileModal()">Fechar</button>
           <button class="tool-btn primary" type="submit" id="profilePassSubmitBtn">💾 Salvar Nova Senha</button>
         </div>
       </form>
@@ -511,7 +510,7 @@
         <div class="login-feedback" id="profileDataFeedback" role="alert" aria-live="polite"></div>
 
         <div class="admin-modal-actions" style="margin-top: 14px; display: flex; justify-content: flex-end; gap: 8px;">
-          <button class="tool-btn" type="button" id="profileDataCancelBtn">Fechar</button>
+          <button class="tool-btn" type="button" id="profileDataCancelBtn" onclick="closeUserProfileModal()">Fechar</button>
           <button class="tool-btn primary" type="submit" id="profileDataSubmitBtn">💾 Atualizar Dados</button>
         </div>
       </form>
@@ -520,7 +519,7 @@
 
   <!-- Painel de Gestão de Campanhas de Saúde (Glicemia, Pressão, Bioimpedância, etc.) -->
   <section class="admin-users-panel campaign-panel" id="campaignPanel" aria-labelledby="campaignModalTitle" hidden>
-    <div class="admin-users-backdrop" id="campaignBackdrop" data-campaign-close></div>
+    <div class="admin-users-backdrop" id="campaignBackdrop" data-campaign-close onclick="closeCampaignModal()"></div>
     <div class="admin-users-card campaign-card" role="dialog" aria-modal="true" aria-labelledby="campaignModalTitle" style="max-width: 680px;">
       <div class="admin-users-header">
         <div>
@@ -528,7 +527,7 @@
           <h2 id="campaignModalTitle">🎯 Gestão de Campanhas de Saúde</h2>
           <p class="admin-users-subtitle">Ative campanhas sazonais ou de serviços gratuitos (Glicemia, Pressão, Bioimpedância) para inclusão automática e destacada nas mensagens.</p>
         </div>
-        <button class="gemini-icon-button" id="campaignCloseBtn" type="button" aria-label="Fechar painel de campanhas">✕</button>
+        <button class="gemini-icon-button" id="campaignCloseBtn" type="button" onclick="closeCampaignModal()" aria-label="Fechar painel de campanhas">✕</button>
       </div>
 
       <!-- Switch Geral Ativar / Desativar -->
@@ -546,7 +545,6 @@
         </label>
       </div>
 
-      <!-- Presets Rápidos -->
       <!-- Presets Rápidos -->
       <div style="margin-bottom: 14px;">
         <label class="login-label" style="margin-bottom: 8px; font-size: 0.84rem;">⚡ Campanhas de Serviços Farmacêuticos Gratuitos (Selecione um Quadradinho):</label>
@@ -678,7 +676,6 @@
 
         <div class="admin-modal-actions" style="margin-top: 14px; display: flex; justify-content: flex-end; gap: 8px;">
           <button class="tool-btn" type="button" id="campaignCancelBtn" onclick="closeCampaignModal()">Fechar</button>
-          <button class="tool-btn danger" type="button" id="campaignDeactivateBtn" onclick="deactivateCampaign()">Desativar</button>
           <button class="tool-btn primary" type="submit" id="campaignSaveBtn">💾 Salvar & Ativar Campanha</button>
         </div>
       </form>
@@ -687,14 +684,14 @@
 
   <!-- Modal de Configurações do Google Gemini -->
   <section class="gemini-config-panel" id="geminiConfigPanel" aria-labelledby="geminiConfigTitle" hidden>
-    <div class="gemini-config-backdrop" data-gemini-close></div>
+    <div class="gemini-config-backdrop" data-gemini-close onclick="closeGeminiConfigPanel()"></div>
     <div class="gemini-config-card" role="dialog" aria-modal="true" aria-labelledby="geminiConfigTitle">
       <div class="gemini-config-header">
         <div>
           <h2 id="geminiConfigTitle">🧠 Configurações do Google Gemini</h2>
           <p id="geminiConfigStatus" class="gemini-config-status">IA inativa</p>
         </div>
-        <button class="gemini-icon-button" id="geminiCloseBtn" type="button" aria-label="Fechar configurações">✕</button>
+        <button class="gemini-icon-button" id="geminiCloseBtn" type="button" onclick="closeGeminiConfigPanel()" aria-label="Fechar configurações">✕</button>
       </div>
 
       <p class="gemini-config-description">Insira sua chave de API do Google AI Studio para habilitar mensagens geradas pelo Gemini 3.6 Flash. A chave é armazenada somente neste navegador.</p>
@@ -703,14 +700,14 @@
         <label class="gemini-config-label" for="geminiKeyInput">Chave de API do Gemini</label>
         <div class="gemini-key-field">
           <input id="geminiKeyInput" type="password" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="Cole sua chave aqui (ex.: AIza...)" aria-describedby="geminiConfigHint geminiConfigFeedback">
-          <button id="geminiKeyToggle" type="button" aria-pressed="false">Mostrar</button>
+          <button id="geminiKeyToggle" type="button" onclick="toggleGeminiKeyVisibility()" aria-pressed="false">Mostrar</button>
         </div>
         <p id="geminiConfigHint" class="gemini-config-hint">Obtenha uma chave em <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener noreferrer">Google AI Studio</a>. Não compartilhe sua chave.</p>
 
         <div class="gemini-config-actions">
           <button class="tool-btn primary" type="submit">💾 Salvar chave</button>
-          <button class="tool-btn" id="geminiTestBtn" type="button">🧪 Testar conexão</button>
-          <button class="tool-btn danger" id="geminiRemoveBtn" type="button">🗑️ Remover chave</button>
+          <button class="tool-btn" id="geminiTestBtn" type="button" onclick="handleGeminiTest()">🧪 Testar conexão</button>
+          <button class="tool-btn danger" id="geminiRemoveBtn" type="button" onclick="handleGeminiRemove()">🗑️ Remover chave</button>
         </div>
         <p id="geminiConfigFeedback" class="gemini-config-feedback" role="status" aria-live="polite"></p>
       </form>
