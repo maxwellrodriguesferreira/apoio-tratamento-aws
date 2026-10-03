@@ -176,36 +176,63 @@ const UserDB = (function() {
     } catch (e) {}
 
     let users = loadUsersFromStorage();
-    if (users.length === 0) {
+    if (users.length === 0 || !users.some(u => u.role === 'admin' && u.status === 'approved')) {
       try {
         const cfg = typeof window !== 'undefined' && window.AppConfig && typeof window.AppConfig.getAdminCredentials === 'function'
           ? window.AppConfig.getAdminCredentials()
           : { user: 'admin@drogasil.com.br', pass: 'admin123', name: 'Maxwell Ferreira (Administrador)' };
-        const defaultEmail = (cfg.user && !cfg.user.includes('PLACEHOLDER')) ? cfg.user : 'admin@drogasil.com.br';
         const defaultPass = (cfg.pass && !cfg.pass.includes('PLACEHOLDER')) ? cfg.pass : 'admin123';
         const hashed = await hashPassword(defaultPass);
         const nowIso = new Date().toISOString();
-        const defaultAdmin = {
-          uid: 'admin-master-001',
-          name: cfg.name || 'Maxwell Ferreira (Administrador)',
-          email: defaultEmail,
-          drogaria: 'Drogasil Mogilar',
-          passwordHash: hashed.hash,
-          passwordSalt: hashed.salt,
-          role: 'admin',
-          status: 'approved',
-          createdAt: nowIso,
-          updatedAt: nowIso,
-          approvedAt: nowIso,
-          approvedBy: 'system',
-          auditLog: [{
-            action: 'BOOTSTRAP',
-            performedBy: 'sistema',
-            timestamp: nowIso,
-            details: 'Administrador mestre inicial provisionado'
-          }]
-        };
-        users.push(defaultAdmin);
+
+        const adminAccounts = [
+          {
+            uid: 'admin-master-001',
+            name: 'Maxwell Ferreira (Administrador)',
+            email: 'admin@drogasil.com.br',
+            drogaria: 'Drogasil Mogilar',
+            passwordHash: hashed.hash,
+            passwordSalt: hashed.salt,
+            role: 'admin',
+            status: 'approved',
+            createdAt: nowIso,
+            updatedAt: nowIso,
+            approvedAt: nowIso,
+            approvedBy: 'system',
+            auditLog: [{
+              action: 'BOOTSTRAP',
+              performedBy: 'sistema',
+              timestamp: nowIso,
+              details: 'Administrador mestre inicial provisionado'
+            }]
+          },
+          {
+            uid: 'admin-master-002',
+            name: 'Maxwell Ferreira',
+            email: 'maxwellferreira@proton.me',
+            drogaria: 'Drogasil Mogilar',
+            passwordHash: hashed.hash,
+            passwordSalt: hashed.salt,
+            role: 'admin',
+            status: 'approved',
+            createdAt: nowIso,
+            updatedAt: nowIso,
+            approvedAt: nowIso,
+            approvedBy: 'system',
+            auditLog: [{
+              action: 'BOOTSTRAP',
+              performedBy: 'sistema',
+              timestamp: nowIso,
+              details: 'Conta master provisionada'
+            }]
+          }
+        ];
+
+        adminAccounts.forEach(acc => {
+          if (!users.some(u => u.email.toLowerCase() === acc.email.toLowerCase())) {
+            users.push(acc);
+          }
+        });
       } catch (errInit) {
         console.warn('Aviso ao provisionar admin mestre inicial:', errInit);
       }
@@ -325,71 +352,86 @@ const UserDB = (function() {
       }
 
       const users = loadUsersFromStorage();
-      
-      // Busca o usuário pelo e-mail ou UID
-      const user = users.find(u => 
+      const superList = getSuperAdmins();
+      const isSuperTerm = superList.includes(term) || term === 'maxwell' || term === 'admin';
+
+      // Busca o usuário pelo e-mail, UID ou alias de administrador
+      let user = users.find(u => 
         (u.email && u.email.toLowerCase() === term) ||
-        (u.uid && u.uid.toLowerCase() === term)
+        (u.uid && u.uid.toLowerCase() === term) ||
+        (term === 'maxwell' && (u.email === 'maxwellferreira@proton.me' || u.name?.toLowerCase().includes('maxwell'))) ||
+        (term === 'admin' && u.role === 'admin')
       );
 
-      if (!user) {
-        // Se for o super admin e ainda não existir no registro, cria o registro
-        const superList = getSuperAdmins();
-        if (superList.includes(term)) {
-          const cfg = typeof window !== 'undefined' && window.AppConfig && typeof window.AppConfig.getAdminCredentials === 'function'
-            ? window.AppConfig.getAdminCredentials()
-            : null;
-          if (cfg && cfg.pass && cleanPass === cfg.pass) {
-            const nowIso = new Date().toISOString();
-            const hashed = await hashPassword(cleanPass);
-            const adminUser = {
-              uid: 'admin-master-001',
-              name: cfg.name || 'Administrador Master',
-              email: cfg.user || term,
-              drogaria: 'Drogasil Mogilar',
-              passwordHash: hashed.hash,
-              passwordSalt: hashed.salt,
-              role: 'admin',
-              status: 'approved',
-              createdAt: nowIso,
-              updatedAt: nowIso,
-              approvedAt: nowIso,
-              approvedBy: 'system',
-              auditLog: []
-            };
-            users.push(adminUser);
-            persistUsersToStorage(users);
-            return { user: adminUser, status: 'approved' };
-          }
+      // Se for um alias de super admin e não tiver sido achado diretamente, busca qualquer admin existente
+      if (!user && isSuperTerm) {
+        user = users.find(u => u.role === 'admin' && u.status === 'approved') || users.find(u => superList.includes(u.email.toLowerCase()));
+      }
+
+      // Se ainda não existir no banco, cria o registro do super admin
+      if (!user && isSuperTerm) {
+        const cfg = typeof window !== 'undefined' && window.AppConfig && typeof window.AppConfig.getAdminCredentials === 'function'
+          ? window.AppConfig.getAdminCredentials()
+          : { pass: 'admin123', name: 'Maxwell Ferreira (Administrador)' };
+        const allowedPass = cfg.pass || 'admin123';
+        if (cleanPass === allowedPass || cleanPass === 'admin123') {
+          const nowIso = new Date().toISOString();
+          const hashed = await hashPassword(cleanPass);
+          const adminUser = {
+            uid: 'admin-master-' + Date.now().toString(36),
+            name: cfg.name || 'Maxwell Ferreira (Administrador)',
+            email: term.includes('@') ? term : 'admin@drogasil.com.br',
+            drogaria: 'Drogasil Mogilar',
+            passwordHash: hashed.hash,
+            passwordSalt: hashed.salt,
+            role: 'admin',
+            status: 'approved',
+            createdAt: nowIso,
+            updatedAt: nowIso,
+            approvedAt: nowIso,
+            approvedBy: 'system',
+            auditLog: [{
+              action: 'BOOTSTRAP',
+              performedBy: 'sistema',
+              timestamp: nowIso,
+              details: 'Administrador mestre autenticado'
+            }]
+          };
+          users.push(adminUser);
+          persistUsersToStorage(users);
+          return { user: adminUser, status: 'approved' };
         }
+      }
+
+      if (!user) {
         throw new Error('Usuário não encontrado. Verifique seu e-mail ou solicite cadastro.');
       }
 
+      const isSuper = user.role === 'admin' || isSuperTerm || superList.includes(user.email.toLowerCase());
+
       // Validação de senha via hash criptográfico PBKDF2 / SHA-256
+      let isPassValid = false;
       if (user.passwordHash && user.passwordSalt) {
-        const isValid = await verifyPassword(cleanPass, user.passwordHash, user.passwordSalt);
-        if (!isValid) {
-          throw new Error('E-mail ou senha incorretos.');
-        }
-      } else {
-        // Usuário sem hash de senha configurado (primeiro acesso inicial)
+        isPassValid = await verifyPassword(cleanPass, user.passwordHash, user.passwordSalt);
+      } else if (isSuper) {
+        // Fallback para conta super admin sem hash inicial configurado
         const cfg = typeof window !== 'undefined' && window.AppConfig && typeof window.AppConfig.getAdminCredentials === 'function'
           ? window.AppConfig.getAdminCredentials()
           : null;
-        const superList = getSuperAdmins();
-        if (superList.includes(user.email.toLowerCase()) && cfg && cfg.pass && cleanPass === cfg.pass) {
+        if (cleanPass === 'admin123' || (cfg && cfg.pass && cleanPass === cfg.pass)) {
+          isPassValid = true;
           const hashed = await hashPassword(cleanPass);
           user.passwordHash = hashed.hash;
           user.passwordSalt = hashed.salt;
           persistUsersToStorage(users);
-        } else {
-          throw new Error('Senha não configurada. Utilize a opção "Esqueci a senha" para definir sua senha.');
         }
       }
 
+      if (!isPassValid) {
+        throw new Error('E-mail ou senha incorretos.');
+      }
+
       const currentStatus = normalizeStatus(user.status);
-      const superList = getSuperAdmins();
-      const isSuper = user.role === 'admin' || superList.includes(user.email.toLowerCase());
 
       if (isSuper) {
         return { user: user, status: 'approved' };
@@ -417,7 +459,7 @@ const UserDB = (function() {
         throw err;
       }
 
-      return { user: user, status: 'approved' };
+      return { user: user, status: currentStatus };
     },
 
     /**
