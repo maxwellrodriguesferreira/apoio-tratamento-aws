@@ -1,6 +1,7 @@
 {
   "name": "terminal-apoio-tratamento-aws",
   "version": "2026.10.0",
+  "type": "module",
   "description": "Terminal de Apoio ao Tratamento & Serviços Farmacêuticos com AWS Amplify Gen 2, Amazon Cognito, DynamoDB e Google Gemini",
   "private": true,
   "scripts": {

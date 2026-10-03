@@ -1,9 +1,9 @@
 import { defineBackend } from '@aws-amplify/backend';
 import { PolicyStatement, Effect } from 'aws-cdk-lib/aws-iam';
-import { auth } from './auth/resource';
-import { data } from './data/resource';
-import { adminActions } from './functions/admin-actions/resource';
-import { geminiService } from './functions/gemini-service/resource';
+import { auth } from './auth/resource.js';
+import { data } from './data/resource.js';
+import { adminActions } from './functions/admin-actions/resource.js';
+import { geminiService } from './functions/gemini-service/resource.js';
 
 /**
  * Terminal Apoio ao Tratamento - Drogasil Mogilar

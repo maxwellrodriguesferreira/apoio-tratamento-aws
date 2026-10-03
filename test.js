@@ -1,4 +1,6 @@
-const fs = require('fs');
+import fs from 'node:fs';
+import vm from 'node:vm';
+import crypto from 'node:crypto';
 
 const app = fs.readFileSync('/home/maxwell/terminal/app.js', 'utf8');
 const html = fs.readFileSync('/home/maxwell/terminal/index.html', 'utf8');
@@ -49,7 +51,6 @@ if (failed.length) {
   throw new Error(`Falha nos testes do painel Gemini: ${failed.join(', ')}`);
 }
 
-const vm = require('vm');
 const functionMatch = app.match(/function sanitizeGeminiJsonResponse\([\s\S]*?\n\}/);
 if (!functionMatch) {
   throw new Error('Falha nos testes do parser Gemini: função sanitizeGeminiJsonResponse não encontrada.');
@@ -452,7 +453,6 @@ if (!checkPromoted || checkPromoted.role !== 'admin') {
 
 // 7. Teste de Ciclo de Vida de Senha & Revogação da Senha Antiga
 (async () => {
-  const crypto = require('crypto');
   const userDbContext = {
     console,
     JSON,
