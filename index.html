@@ -140,9 +140,6 @@
             <span class="custom-checkbox"></span>
             <span>Lembrar sessão</span>
           </label>
-          <button type="button" id="forgotPassLinkBtn" class="auth-link-btn" title="Recuperar ou redefinir senha de acesso">
-            Esqueci a senha
-          </button>
         </div>
 
         <div class="login-feedback" id="loginFeedback" role="alert" aria-live="polite"></div>
@@ -150,75 +147,6 @@
         <div class="login-actions">
           <button class="tool-btn primary login-btn" type="submit" id="loginSubmitBtn">
             ⚡ Acessar Terminal
-          </button>
-        </div>
-      </form>
-
-      <!-- Formulário 1: Solicitar Redefinição de Senha (Esqueci a Senha) -->
-      <form id="forgotPassForm" novalidate autocomplete="off" style="display: none;">
-        <div class="login-field-group">
-          <label class="login-label" for="forgotEmailInput">
-            <span>✉️</span> E-mail Cadastrado
-          </label>
-          <div class="login-input-wrapper">
-            <input id="forgotEmailInput" type="email" autocomplete="email" autocapitalize="none" spellcheck="false" placeholder="seu-email@exemplo.com" required>
-          </div>
-        </div>
-
-        <div class="login-security-notice" style="margin-top: 10px;">
-          <span>Informe seu e-mail cadastrado para gerar o código de recuperação e redefinir sua senha com segurança.</span>
-        </div>
-
-        <div class="login-feedback" id="forgotFeedback" role="alert" aria-live="polite"></div>
-
-        <div class="login-actions" style="display: flex; gap: 8px;">
-          <button class="tool-btn" type="button" id="forgotBackToLoginBtn">
-            ← Voltar
-          </button>
-          <button class="tool-btn primary login-btn" type="submit" id="forgotSubmitBtn" style="flex: 1;">
-            🔑 Enviar Código de Recuperação
-          </button>
-        </div>
-      </form>
-
-      <!-- Formulário 2: Confirmar Nova Senha com Código -->
-      <form id="confirmResetForm" novalidate autocomplete="off" style="display: none;">
-        <div class="login-field-group">
-          <label class="login-label" for="resetCodeInput">
-            <span>🔢</span> Código de Verificação
-          </label>
-          <div class="login-input-wrapper">
-            <input id="resetCodeInput" type="text" autocomplete="one-time-code" placeholder="Digite o código de 6 dígitos..." required>
-          </div>
-        </div>
-
-        <div class="login-field-group">
-          <label class="login-label" for="resetNewPassInput">
-            <span>🔑</span> Nova Senha (Mínimo 6 caracteres)
-          </label>
-          <div class="login-input-wrapper password-wrapper">
-            <input id="resetNewPassInput" type="password" autocomplete="new-password" placeholder="Defina a nova senha..." minlength="6" required>
-            <button id="resetPassToggle" type="button" aria-label="Mostrar ou ocultar senha" title="Mostrar/Ocultar senha">👁️</button>
-          </div>
-        </div>
-
-        <div class="login-field-group">
-          <label class="login-label" for="resetConfirmPassInput">
-            <span>🔒</span> Confirmar Nova Senha
-          </label>
-          <div class="login-input-wrapper">
-            <input id="resetConfirmPassInput" type="password" autocomplete="new-password" placeholder="Repita a nova senha..." minlength="6" required>
-          </div>
-        </div>
-
-        <div class="login-feedback" id="confirmResetFeedback" role="alert" aria-live="polite"></div>
-
-        <div class="login-actions" style="display: flex; gap: 8px;">
-          <button class="tool-btn" type="button" id="confirmResetBackBtn">
-            ← Voltar
-          </button>
-          <button class="tool-btn primary login-btn" type="submit" id="confirmResetSubmitBtn" style="flex: 1;">
-            ✅ Salvar Nova Senha
           </button>
         </div>
       </form>

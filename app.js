@@ -374,16 +374,12 @@ function switchAuthTab(tab) {
   const tabRegisterBtn = document.getElementById('tabRegisterBtn');
   const loginForm = document.getElementById('loginForm');
   const registerForm = document.getElementById('registerForm');
-  const forgotPassForm = document.getElementById('forgotPassForm');
-  const confirmResetForm = document.getElementById('confirmResetForm');
   const loginBadge = document.getElementById('loginBadge');
   const noticeContent = document.getElementById('noticeContent');
 
   // Esconde todos os formulários inicialmente
   if (loginForm) loginForm.style.display = 'none';
   if (registerForm) registerForm.style.display = 'none';
-  if (forgotPassForm) forgotPassForm.style.display = 'none';
-  if (confirmResetForm) confirmResetForm.style.display = 'none';
 
   if (tab === 'register') {
     if (tabLoginBtn) { tabLoginBtn.classList.remove('active'); tabLoginBtn.setAttribute('aria-selected', 'false'); }
@@ -393,22 +389,6 @@ function switchAuthTab(tab) {
     if (noticeContent) noticeContent.textContent = 'Preencha seus dados para solicitar cadastro. O acesso depende de aprovação administrativa.';
     const regName = document.getElementById('regNameInput');
     setTimeout(() => regName?.focus(), 50);
-  } else if (tab === 'forgot') {
-    if (tabLoginBtn) { tabLoginBtn.classList.remove('active'); tabLoginBtn.setAttribute('aria-selected', 'false'); }
-    if (tabRegisterBtn) { tabRegisterBtn.classList.remove('active'); tabRegisterBtn.setAttribute('aria-selected', 'false'); }
-    if (forgotPassForm) forgotPassForm.style.display = 'block';
-    if (loginBadge) loginBadge.textContent = '🔑 RECUPERAÇÃO DE SENHA';
-    if (noticeContent) noticeContent.textContent = 'Informe o e-mail cadastrado para gerar o código de recuperação e redefinir sua senha.';
-    const forgotEmail = document.getElementById('forgotEmailInput');
-    setTimeout(() => forgotEmail?.focus(), 50);
-  } else if (tab === 'confirmReset') {
-    if (tabLoginBtn) { tabLoginBtn.classList.remove('active'); tabLoginBtn.setAttribute('aria-selected', 'false'); }
-    if (tabRegisterBtn) { tabRegisterBtn.classList.remove('active'); tabRegisterBtn.setAttribute('aria-selected', 'false'); }
-    if (confirmResetForm) confirmResetForm.style.display = 'block';
-    if (loginBadge) loginBadge.textContent = '🔒 DEFINIR NOVA SENHA';
-    if (noticeContent) noticeContent.textContent = 'Digite o código de verificação recebido e cadastre a sua nova senha.';
-    const resetCode = document.getElementById('resetCodeInput');
-    setTimeout(() => resetCode?.focus(), 50);
   } else {
     if (tabRegisterBtn) { tabRegisterBtn.classList.remove('active'); tabRegisterBtn.setAttribute('aria-selected', 'false'); }
     if (tabLoginBtn) { tabLoginBtn.classList.add('active'); tabLoginBtn.setAttribute('aria-selected', 'true'); }
@@ -1808,27 +1788,14 @@ async function initializeAuth() {
   const adminSearchInput = document.getElementById('adminSearchInput');
   const adminSearchClearBtn = document.getElementById('adminSearchClearBtn');
 
-  const forgotPassLinkBtn = document.getElementById('forgotPassLinkBtn');
-  const forgotPassForm = document.getElementById('forgotPassForm');
-  const confirmResetForm = document.getElementById('confirmResetForm');
-  const forgotBackToLoginBtn = document.getElementById('forgotBackToLoginBtn');
-  const confirmResetBackBtn = document.getElementById('confirmResetBackBtn');
-  const resetPassToggle = document.getElementById('resetPassToggle');
-
   if (tabLoginBtn) tabLoginBtn.addEventListener('click', () => switchAuthTab('login'));
   if (tabRegisterBtn) tabRegisterBtn.addEventListener('click', () => switchAuthTab('register'));
-  if (forgotPassLinkBtn) forgotPassLinkBtn.addEventListener('click', () => switchAuthTab('forgot'));
-  if (forgotBackToLoginBtn) forgotBackToLoginBtn.addEventListener('click', () => switchAuthTab('login'));
-  if (confirmResetBackBtn) confirmResetBackBtn.addEventListener('click', () => switchAuthTab('forgot'));
 
   if (loginForm) loginForm.addEventListener('submit', handleLoginSubmit);
   if (registerForm) registerForm.addEventListener('submit', handleRegisterSubmit);
-  if (forgotPassForm) forgotPassForm.addEventListener('submit', handleForgotPasswordSubmit);
-  if (confirmResetForm) confirmResetForm.addEventListener('submit', handleConfirmResetSubmit);
 
   if (loginPassToggle) loginPassToggle.addEventListener('click', toggleLoginPassVisibility);
   if (regPassToggle) regPassToggle.addEventListener('click', toggleRegisterPassVisibility);
-  if (resetPassToggle) resetPassToggle.addEventListener('click', toggleResetPassVisibility);
 
   if (loginThemeBtn) loginThemeBtn.addEventListener('click', toggleTheme);
   if (loginAboutBtn) loginAboutBtn.addEventListener('click', openLoginAboutModal);
