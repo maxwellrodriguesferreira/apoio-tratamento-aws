@@ -459,18 +459,31 @@ async function handleForgotPasswordSubmit(e) {
     }
 
     pendingResetEmail = email;
-    showForgotFeedback('✅ Solicitação enviada! Verifique seu e-mail cadastrado.', 'is-success');
-    appendLog(`🔑 <strong>Recuperação de Senha:</strong> Solicitação de código de verificação para <strong>${escapeHTML(email)}</strong>.`, 'log-info');
+    const isLocalMode = Boolean(result && (result.isLocal || result.code));
+
+    if (isLocalMode && result.code) {
+      showForgotFeedback(`✅ Código de recuperação: ${result.code}`, 'is-success');
+      appendLog(`🔑 <strong>Recuperação de Senha:</strong> Código de verificação gerado para <strong>${escapeHTML(email)}</strong>: <code>${escapeHTML(result.code)}</code>.`, 'log-warning');
+    } else {
+      showForgotFeedback('✅ Solicitação enviada! Verifique seu e-mail cadastrado.', 'is-success');
+      appendLog(`🔑 <strong>Recuperação de Senha:</strong> Solicitação de código enviada para <strong>${escapeHTML(email)}</strong>.`, 'log-info');
+    }
 
     setTimeout(() => {
       switchAuthTab('confirmReset');
-      showConfirmResetFeedback('📬 Digite o código de 6 dígitos enviado para o seu e-mail cadastrado.', 'is-warning');
       const codeField = document.getElementById('resetCodeInput');
       if (codeField) {
-        codeField.value = '';
-        codeField.focus();
+        if (isLocalMode && result.code) {
+          codeField.value = result.code;
+          showConfirmResetFeedback(`🔐 Modo Local/Offline: Código [${result.code}] preenchido automaticamente. Defina sua nova senha abaixo.`, 'is-success');
+        } else {
+          codeField.value = '';
+          showConfirmResetFeedback('📬 Digite o código de 6 dígitos enviado para o seu e-mail cadastrado.', 'is-warning');
+        }
+        const newPassField = document.getElementById('resetNewPassInput');
+        if (newPassField) newPassField.focus();
       }
-    }, 1000);
+    }, 800);
   } catch (err) {
     console.error('Erro na solicitação de recuperação:', err);
     showForgotFeedback(`⚠️ ${err.message || 'Falha ao solicitar recuperação de senha.'}`, 'is-error');

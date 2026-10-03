@@ -373,14 +373,14 @@ const CognitoAuth = (function() {
 
           cognitoUser.forgotPassword({
             onSuccess: function(data) {
-              resolve({ success: true, message: 'Código de recuperação enviado para seu e-mail cadastrado.', data });
+              resolve({ success: true, message: 'Código de recuperação enviado para seu e-mail cadastrado via AWS.', data, isLocal: false });
             },
             onFailure: function(err) {
               // Se falhar no Cognito, aciona o fallback no banco de dados local
               fallbackLocal();
             },
             inputVerificationCode: function(data) {
-              resolve({ success: true, message: 'Código de verificação enviado para seu e-mail cadastrado.', data, requiresCode: true });
+              resolve({ success: true, message: 'Código de verificação enviado para seu e-mail cadastrado via AWS.', data, requiresCode: true, isLocal: false });
             }
           });
         } catch (e) {
