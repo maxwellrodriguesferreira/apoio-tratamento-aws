@@ -159,8 +159,27 @@ const CognitoAuth = (function() {
         ];
 
         try {
-          userPool.signUp(cleanEmail, password, attributeList, null, (err, result) => {
+          userPool.signUp(cleanEmail, password, attributeList, null, async (err, result) => {
             if (err) {
+              console.warn('Aviso do AWS Cognito no signUp:', err);
+              // Fallback automático transparente: se o User Pool não estiver provisionado na AWS,
+              // salva o novo usuário como PENDENTE no banco de dados local para moderação pelo Administrador
+              const isFallbackError = 
+                err.code === 'ResourceNotFoundException' ||
+                err.code === 'InvalidParameterException' ||
+                err.code === 'NetworkingError' ||
+                err.name === 'ResourceNotFoundException' ||
+                (err.message && (err.message.includes('not found') || err.message.includes('ResourceNotFound') || err.message.includes('não encontrado')));
+
+              if (isFallbackError && typeof window !== 'undefined' && window.UserDB && typeof window.UserDB.registerUser === 'function') {
+                try {
+                  const localUser = await window.UserDB.registerUser(cleanName, cleanEmail, cleanDrogaria, password);
+                  return resolve(localUser);
+                } catch (dbErr) {
+                  return reject(dbErr);
+                }
+              }
+
               const friendlyMsg = translateCognitoError(err, cleanEmail);
               const error = new Error(friendlyMsg);
               error.code = err.code;
@@ -179,17 +198,23 @@ const CognitoAuth = (function() {
               createdAt: new Date().toISOString()
             };
 
-            // Salva no registro local para redundância rápida
-            if (typeof window !== 'undefined' && window.UserDB && typeof window.UserDB.getAllUsers === 'function') {
+            // Salva no registro local para moderação e listagem no Painel Admin
+            if (typeof window !== 'undefined' && window.UserDB && typeof window.UserDB.registerUser === 'function') {
               try {
-                const users = window.UserDB.getAllUsers();
-                if (!users.some(u => u.email === cleanEmail)) {
-                  users.push(userRecord);
-                  if (typeof localStorage !== 'undefined') {
-                    localStorage.setItem('apoio_users_registry', JSON.stringify(users));
+                await window.UserDB.registerUser(cleanName, cleanEmail, cleanDrogaria, password);
+              } catch (e) {
+                // Se já estiver salvo, sincroniza no storage
+                try {
+                  const users = window.UserDB.getAllUsers();
+                  if (!users.some(u => u.email === cleanEmail)) {
+                    users.push(userRecord);
+                    if (typeof localStorage !== 'undefined') {
+                      localStorage.setItem('apoio_users_database_v2', JSON.stringify(users));
+                      localStorage.setItem('apoio_users_registry', JSON.stringify(users));
+                    }
                   }
-                }
-              } catch (e) {}
+                } catch (errSync) {}
+              }
             }
 
             resolve(userRecord);

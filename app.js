@@ -684,12 +684,23 @@ async function handleRegisterSubmit(e) {
     const users = getRegisteredUsers();
     let newUser = null;
 
-    // 1. Tenta cadastro no AWS Cognito se disponível
-    if (typeof window !== 'undefined' && window.CognitoAuth && typeof window.CognitoAuth.signUp === 'function') {
-      newUser = await window.CognitoAuth.signUp(name, email, drogaria, pass);
-    } else if (typeof window !== 'undefined' && window.UserDB && typeof window.UserDB.registerUser === 'function') {
-      newUser = await window.UserDB.registerUser(name, email, drogaria, pass);
-    } else {
+    // 1. Tenta cadastro no AWS Cognito se disponível com fallback automático garantido
+    try {
+      if (typeof window !== 'undefined' && window.CognitoAuth && typeof window.CognitoAuth.signUp === 'function') {
+        newUser = await window.CognitoAuth.signUp(name, email, drogaria, pass);
+      } else if (typeof window !== 'undefined' && window.UserDB && typeof window.UserDB.registerUser === 'function') {
+        newUser = await window.UserDB.registerUser(name, email, drogaria, pass);
+      }
+    } catch (authErr) {
+      console.warn('Falha no CognitoAuth.signUp, aplicando fallback seguro local:', authErr);
+      if (typeof window !== 'undefined' && window.UserDB && typeof window.UserDB.registerUser === 'function') {
+        newUser = await window.UserDB.registerUser(name, email, drogaria, pass);
+      } else {
+        throw authErr;
+      }
+    }
+
+    if (!newUser) {
       const isExplicitSuper = SUPER_ADMIN_EMAILS.includes(email);
       const isFirstAdmin = isExplicitSuper;
       const nowIso = new Date().toISOString();
