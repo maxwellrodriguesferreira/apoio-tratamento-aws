@@ -493,13 +493,13 @@ if (!checkPromoted || checkPromoted.role !== 'admin') {
     throw new Error('Falha no teste: Primeiro login do admin falhou.');
   }
 
-  // 7.2. Usuário altera a senha para uma nova senha forte
+  // 7.2. Usuário altera a senha pela 1ª vez para NovaSenhaSegura456!
   await cauth.changePassword('admin@drogasil.com.br', 'admin123', 'NovaSenhaSegura456!');
 
   // 7.3. Tenta autenticar com a NOVA senha -> DEVE TER SUCESSO
-  const loginNew = await cauth.signIn('admin@drogasil.com.br', 'NovaSenhaSegura456!');
-  if (!loginNew || !loginNew.user) {
-    throw new Error('Falha no teste: Login com nova senha alterada falhou.');
+  const loginNew1 = await cauth.signIn('admin@drogasil.com.br', 'NovaSenhaSegura456!');
+  if (!loginNew1 || !loginNew1.user) {
+    throw new Error('Falha no teste: Login com 1ª nova senha alterada falhou.');
   }
 
   // 7.4. Tenta autenticar com a SENHA ANTIGA PADRÃO ("admin123") -> DEVE SER REJEITADO
@@ -510,10 +510,52 @@ if (!checkPromoted || checkPromoted.role !== 'admin') {
     oldPassRejected = true;
   }
   if (!oldPassRejected) {
-    throw new Error('Falha de segurança crítica: A senha antiga padrão continuou sendo aceita após a alteração!');
+    throw new Error('Falha de segurança crítica: A senha antiga padrão continuou sendo aceita após a 1ª alteração!');
   }
 
-  console.log('✅ Teste de Segurança: Senha antiga padrão é devidamente bloqueada após alteração de senha.');
+  // 7.5. Usuário altera a senha pela 2ª vez para OutraSenhaMaisNova789#
+  await cauth.changePassword('admin@drogasil.com.br', 'NovaSenhaSegura456!', 'OutraSenhaMaisNova789#');
+
+  // 7.6. Tenta autenticar com a 2ª senha antiga ("NovaSenhaSegura456!") -> DEVE SER REJEITADO
+  let oldPass2Rejected = false;
+  try {
+    await cauth.signIn('admin@drogasil.com.br', 'NovaSenhaSegura456!');
+  } catch (err) {
+    oldPass2Rejected = true;
+  }
+  if (!oldPass2Rejected) {
+    throw new Error('Falha de segurança crítica: A senha intermediária anterior continuou sendo aceita após a 2ª alteração!');
+  }
+
+  // 7.7. Tenta autenticar com a 3ª e atual senha ("OutraSenhaMaisNova789#") -> DEVE TER SUCESSO
+  const loginNew2 = await cauth.signIn('admin@drogasil.com.br', 'OutraSenhaMaisNova789#');
+  if (!loginNew2 || !loginNew2.user) {
+    throw new Error('Falha no teste: Login com 2ª nova senha alterada falhou.');
+  }
+
+  // 7.8. Redefinição via Código (Esqueci a Senha) para SenhaFinalDefinitiva999!
+  const resetReq = await udb.requestPasswordReset('admin@drogasil.com.br');
+  const userObj = udb.getUserByEmailOrUid('admin@drogasil.com.br');
+  await udb.confirmPasswordReset('admin@drogasil.com.br', userObj.resetCode, 'SenhaFinalDefinitiva999!');
+
+  // 7.9. Senha antes do reset ("OutraSenhaMaisNova789#") DEVE SER REJEITADA
+  let oldPass3Rejected = false;
+  try {
+    await cauth.signIn('admin@drogasil.com.br', 'OutraSenhaMaisNova789#');
+  } catch (err) {
+    oldPass3Rejected = true;
+  }
+  if (!oldPass3Rejected) {
+    throw new Error('Falha de segurança crítica: Senha anterior ao reset por código continuou sendo aceita!');
+  }
+
+  // 7.10. Senha nova após reset DEVE TER SUCESSO
+  const loginFinal = await cauth.signIn('admin@drogasil.com.br', 'SenhaFinalDefinitiva999!');
+  if (!loginFinal || !loginFinal.user) {
+    throw new Error('Falha no teste: Login após redefinição de senha falhou.');
+  }
+
+  console.log('✅ Teste de Segurança: Todas as senhas anteriores são imediatamente revogadas após qualquer alteração.');
 })().catch(err => {
   console.error(err);
   process.exit(1);
