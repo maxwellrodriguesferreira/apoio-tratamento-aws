@@ -951,10 +951,12 @@ button, input, select, textarea, a {
 .login-backdrop {
   position: absolute;
   inset: 0;
+  pointer-events: none;
 }
 
 .login-card {
   position: relative;
+  z-index: 10;
   width: min(520px, 100%);
   max-height: calc(100dvh - 24px);
   max-height: calc(100vh - 24px);
@@ -1812,10 +1814,12 @@ button, input, select, textarea, a {
 .admin-modal-backdrop {
   position: absolute;
   inset: 0;
+  pointer-events: auto;
 }
 
 .admin-modal-card {
   position: relative;
+  z-index: 10;
   width: min(600px, 100%);
   max-height: calc(100vh - 40px);
   overflow-y: auto;

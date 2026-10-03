@@ -18,13 +18,23 @@ let generatedMessagesHistory = JSON.parse(localStorage.getItem('apoio_tratamento
 const THEMES = ['matrix', 'amber', 'cyberpunk', 'dark'];
 let currentThemeIndex = 0;
 
-// Elementos DOM
-const terminalOutput = document.getElementById('terminalOutput');
-const cliInput = document.getElementById('cliInput');
-const crtOverlay = document.getElementById('crtOverlay');
-const themeToggleBtn = document.getElementById('themeToggleBtn');
-const crtToggleBtn = document.getElementById('crtToggleBtn');
-const historyCounter = document.getElementById('historyCounter');
+// Elementos DOM (resolvidos defensivamente)
+let terminalOutput = typeof document !== 'undefined' ? document.getElementById('terminalOutput') : null;
+let cliInput = typeof document !== 'undefined' ? document.getElementById('cliInput') : null;
+let crtOverlay = typeof document !== 'undefined' ? document.getElementById('crtOverlay') : null;
+let themeToggleBtn = typeof document !== 'undefined' ? document.getElementById('themeToggleBtn') : null;
+let crtToggleBtn = typeof document !== 'undefined' ? document.getElementById('crtToggleBtn') : null;
+let historyCounter = typeof document !== 'undefined' ? document.getElementById('historyCounter') : null;
+
+function resolveDOMElements() {
+  if (typeof document === 'undefined') return;
+  terminalOutput = document.getElementById('terminalOutput');
+  cliInput = document.getElementById('cliInput');
+  crtOverlay = document.getElementById('crtOverlay');
+  themeToggleBtn = document.getElementById('themeToggleBtn');
+  crtToggleBtn = document.getElementById('crtToggleBtn');
+  historyCounter = document.getElementById('historyCounter');
+}
 
 /* ==========================================================================
    SISTEMA DE GESTÃO DE USUÁRIOS, CADASTRO, SUPER USUÁRIO & SESSÃO
@@ -1772,6 +1782,36 @@ if (typeof window !== 'undefined') {
   window.openAdminUsersPanel = openAdminUsersPanel;
   window.closeAdminUsersPanel = closeAdminUsersPanel;
   window.setAdminFilter = setAdminFilter;
+  window.switchAuthTab = switchAuthTab;
+  window.handleLoginSubmit = handleLoginSubmit;
+  window.handleRegisterSubmit = handleRegisterSubmit;
+  window.toggleLoginPassVisibility = toggleLoginPassVisibility;
+  window.toggleRegisterPassVisibility = toggleRegisterPassVisibility;
+  window.toggleTheme = toggleTheme;
+  window.toggleCRT = toggleCRT;
+  window.logoutUser = logoutUser;
+  window.startWizard = startWizard;
+  window.startBatchWizard = startBatchWizard;
+  window.openCampaignModal = openCampaignModal;
+  window.closeCampaignModal = closeCampaignModal;
+  window.toggleCampaignActive = toggleCampaignActive;
+  window.applyCampaignPreset = applyCampaignPreset;
+  window.toggleServiceTag = toggleServiceTag;
+  window.updateCampaignPreview = updateCampaignPreview;
+  window.handleSaveCampaign = handleSaveCampaign;
+  window.deactivateCampaign = deactivateCampaign;
+  window.executeCommand = executeCommand;
+  window.openUserProfileModal = openUserProfileModal;
+  window.closeUserProfileModal = closeUserProfileModal;
+  window.openGeminiConfigPanel = openGeminiConfigPanel;
+  window.closeGeminiConfigPanel = closeGeminiConfigPanel;
+  window.handleGeminiSave = handleGeminiSave;
+  window.handleGeminiRemove = handleGeminiRemove;
+  window.handleGeminiTest = handleGeminiTest;
+  window.showServicesHelp = showServicesHelp;
+  window.showAbout = showAbout;
+  window.showHistory = showHistory;
+  window.cancelWizard = cancelWizard;
 }
 
 async function initializeAuth() {
@@ -1888,7 +1928,7 @@ async function initializeAuth() {
   if (profileNewPassToggle) profileNewPassToggle.addEventListener('click', () => togglePasswordInputVisibility('profileNewPassInput', 'profileNewPassToggle'));
   if (profileConfirmPassToggle) profileConfirmPassToggle.addEventListener('click', () => togglePasswordInputVisibility('profileConfirmNewPassInput', 'profileConfirmPassToggle'));
 
-  if (typeof window !== 'undefined') {
+  if (typeof window !== 'undefined' && typeof window.addEventListener === 'function') {
     window.addEventListener('hashchange', checkAdminUrlRoute);
     window.addEventListener('popstate', checkAdminUrlRoute);
   }
@@ -1948,14 +1988,6 @@ function startMainApp() {
   }
 }
 
-if (typeof document !== 'undefined') {
-  if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', startMainApp);
-  } else {
-    startMainApp();
-  }
-}
-
 // Atualiza o contador de mensagens
 function updateHistoryCounter() {
   const count = generatedMessagesHistory.length;
@@ -1991,14 +2023,19 @@ function toggleTheme() {
 
 // Alternar Efeito CRT
 function toggleCRT() {
-  crtOverlay.classList.toggle('disabled');
-  const isActive = !crtOverlay.classList.contains('disabled');
-  crtToggleBtn.classList.toggle('active', isActive);
-  appendLog(`📺 Efeito CRT Scanlines: <strong>${isActive ? 'ATIVADO' : 'DESATIVADO'}</strong>`, 'log-info');
+  const overlay = crtOverlay || (typeof document !== 'undefined' ? document.getElementById('crtOverlay') : null);
+  const btn = crtToggleBtn || (typeof document !== 'undefined' ? document.getElementById('crtToggleBtn') : null);
+  if (overlay) {
+    overlay.classList.toggle('disabled');
+    const isActive = !overlay.classList.contains('disabled');
+    if (btn) btn.classList.toggle('active', isActive);
+    appendLog(`📺 Efeito CRT Scanlines: <strong>${isActive ? 'ATIVADO' : 'DESATIVADO'}</strong>`, 'log-info');
+  }
 }
 
 // Imprimir Banner Inicial
 function renderWelcomeBanner() {
+  resolveDOMElements();
   const drogaria = escapeHTML(DEFAULT_CONFIG.drogaria || 'Drogaria');
   const farmaceutico = escapeHTML(DEFAULT_CONFIG.farmaceutico || 'Farmacêutico');
   const bannerHTML = `
@@ -2017,7 +2054,10 @@ function renderWelcomeBanner() {
   `;
   const div = document.createElement('div');
   div.innerHTML = bannerHTML;
-  terminalOutput.appendChild(div);
+  const out = terminalOutput || (typeof document !== 'undefined' ? document.getElementById('terminalOutput') : null);
+  if (out) {
+    out.appendChild(div);
+  }
   renderCampaignActiveBanner();
   scrollToBottom();
 }
@@ -2027,39 +2067,93 @@ function renderWelcomeBanner() {
    ========================================================================== */
 
 const CAMPAIGN_PRESETS = {
+  pressao: {
+    id: 'pressao',
+    name: 'Campanha de Aferição de Pressão Arterial Gratuita',
+    icon: '🩺',
+    period: 'nesta semana',
+    services: ['Aferição de Pressão Gratuita'],
+    highlightText: 'Aproveite para passar na farmácia esta semana para realizar gratuitamente sua aferição de pressão arterial com nossa equipe farmacêutica!',
+    extraNote: 'Atendimento rápido e preventivo para cuidar da sua saúde cardiovascular.'
+  },
+  glicemia: {
+    id: 'glicemia',
+    name: 'Campanha de Teste de Glicemia Capilar Gratuito',
+    icon: '🩸',
+    period: 'nesta semana',
+    services: ['Teste de Glicemia Capilar Gratuito'],
+    highlightText: 'Venha realizar seu teste de glicemia capilar gratuito na farmácia e receba orientações personalizadas para o controle do açúcar no sangue!',
+    extraNote: 'Monitore sua glicose de forma rápida e segura com nossos farmacêuticos.'
+  },
+  bioimpedancia: {
+    id: 'bioimpedancia',
+    name: 'Semana da Avaliação Corporal & Bioimpedância Gratuita',
+    icon: '⚖️',
+    period: 'durante este mês',
+    services: ['Exame de Bioimpedância Gratuito'],
+    highlightText: 'Estamos realizando o exame de bioimpedância gratuito na drogaria para você acompanhar sua massa magra, porcentagem de gordura e hidratação!',
+    extraNote: 'Relatório completo e orientações farmacêuticas imediatas.'
+  },
+  orientacao: {
+    id: 'orientacao',
+    name: 'Campanha de Orientação Farmacêutica & Cuidado Continuado Gratuito',
+    icon: '👨‍⚕️',
+    period: 'nesta semana',
+    services: ['Orientação Farmacêutica Especializada Gratuita'],
+    highlightText: 'Traga suas dúvidas sobre horários e combinações de remédios para uma conversa e orientação farmacêutica 100% gratuita na nossa farmácia!',
+    extraNote: 'Segurança e eficácia no seu tratamento diário.'
+  },
+  furo: {
+    id: 'furo',
+    name: 'Ação de Perfuração de Lóbulo Auricular (Furo de Orelha) Humanizado',
+    icon: '👂',
+    period: 'neste período',
+    services: ['Perfuração do Lóbulo Auricular Gratuita'],
+    highlightText: 'Oferecemos colocação humanizada de brincos e perfuração de lóbulo com materiais 100% estéreis e todo o carinho que você e seu bebê merecem!',
+    extraNote: 'Procedimento asséptico, silencioso e seguro realizado por farmacêuticos.'
+  },
+  injetaveis: {
+    id: 'injetaveis',
+    name: 'Serviço Clínico de Aplicação Segura de Medicamentos Injetáveis',
+    icon: '💉',
+    period: 'todos os dias',
+    services: ['Aplicação de Injetáveis'],
+    highlightText: 'Realizamos a aplicação do seu medicamento injetável com receita médica em nossa sala de atendimento farmacêutico climatizada!',
+    extraNote: 'Profissionalismo, técnica asséptica e total segurança para seu tratamento.'
+  },
+  combo: {
+    id: 'combo',
+    name: 'Semana da Saúde Total: Pressão, Glicemia & Bioimpedância Gratuitas',
+    icon: '🌟',
+    period: 'nesta semana',
+    services: ['Aferição de Pressão Gratuita', 'Teste de Glicemia Capilar Gratuito', 'Exame de Bioimpedância Gratuito', 'Orientação Farmacêutica Especializada Gratuita'],
+    highlightText: 'Aproveite nossa Semana da Saúde Total com aferição de pressão, teste de glicemia e exame de bioimpedância 100% gratuitos na drogaria!',
+    extraNote: 'Avaliação clínica completa para toda a família.'
+  },
   cardio: {
     id: 'cardio',
-    name: 'Campanha de Saúde Cardiovascular & Glicemia',
+    name: 'Campanha de Saúde Cardiovascular & Aferição de Pressão Gratuita',
     icon: '🩺',
     period: 'nesta semana',
     services: ['Aferição de Pressão Gratuita', 'Teste de Glicemia Capilar Gratuito'],
     highlightText: 'Aproveite para passar na farmácia esta semana para realizar gratuitamente sua aferição de pressão arterial e teste de glicemia com nossa equipe farmacêutica!',
     extraNote: 'Atendimento preventivo e rápido para monitorar sua saúde de perto.'
   },
-  bioimpedancia: {
-    id: 'bioimpedancia',
-    name: 'Semana da Composição Corporal & Bioimpedância',
-    icon: '⚖️',
-    period: 'durante este mês',
-    services: ['Exame de Bioimpedância Gratuito', 'Avaliação de Massa Magra e Gordura'],
-    highlightText: 'Estamos realizando o exame de bioimpedância gratuito na farmácia para você acompanhar sua evolução corporal, massa muscular e hidratação!',
-    extraNote: 'Relatório imediato com orientações farmacêuticas personalizadas.'
-  },
   diabetes: {
     id: 'diabetes',
-    name: 'Campanha de Prevenção & Controle do Diabetes',
+    name: 'Campanha de Prevenção ao Diabetes & Glicemia Gratuita',
     icon: '🩸',
     period: 'neste mês',
-    services: ['Teste de Glicemia Capilar Gratuito', 'Orientação Farmacêutica Especializada'],
+    services: ['Teste de Glicemia Capilar Gratuito', 'Orientação Farmacêutica Especializada Gratuita'],
     highlightText: 'Participe da nossa ação especial de prevenção ao diabetes com teste de glicemia gratuito e orientações de saúde na farmácia!',
     extraNote: 'Cuidado contínuo e acolhimento para sua qualidade de vida.'
   },
   custom: {
     id: 'custom',
-    name: 'Campanha de Saúde & Serviços Gratuitos',
+    name: 'Campanha de Serviços Farmacêuticos Gratuitos',
     icon: '✨',
     period: 'neste período',
-    services: ['Aferição de Pressão Gratuita', 'Teste de Glicemia Capilar Gratuito', 'Exame de Bioimpedância Gratuito'],
+    services: ['Aferição de Pressão Gratuita', 'Teste de Glicemia Capilar Gratuito'],
     highlightText: 'Venha conferir nossos serviços de saúde gratuitos e orientações farmacêuticas especiais na drogaria!',
     extraNote: 'Esperamos por você para cuidar do seu bem-estar.'
   }
@@ -2067,13 +2161,13 @@ const CAMPAIGN_PRESETS = {
 
 const DEFAULT_CAMPAIGN_STATE = {
   enabled: true,
-  id: 'cardio',
-  name: 'Campanha de Saúde Cardiovascular & Glicemia',
+  id: 'pressao',
+  name: 'Campanha de Aferição de Pressão Arterial Gratuita',
   icon: '🩺',
   period: 'nesta semana',
-  services: ['Aferição de Pressão Gratuita', 'Teste de Glicemia Capilar Gratuito', 'Exame de Bioimpedância Gratuito'],
-  highlightText: 'Aproveite para passar na farmácia esta semana para realizar gratuitamente sua aferição de pressão arterial, teste de glicemia e bioimpedância!',
-  extraNote: 'Atendimento humanizado e sem custos para toda a família.'
+  services: ['Aferição de Pressão Gratuita'],
+  highlightText: 'Aproveite para passar na farmácia esta semana para realizar gratuitamente sua aferição de pressão arterial com nossa equipe farmacêutica!',
+  extraNote: 'Atendimento humanizado e 100% gratuito para toda a família.'
 };
 
 function getActiveCampaign() {
@@ -2136,7 +2230,9 @@ function updateCampaignUIStatus() {
 
 function renderCampaignActiveBanner() {
   const existing = document.getElementById('campaignActiveBanner');
-  if (existing) existing.remove();
+  if (existing && typeof existing.remove === 'function') {
+    existing.remove();
+  }
 
   const camp = getActiveCampaign();
   if (!camp || !camp.enabled) return;
@@ -2167,13 +2263,16 @@ function renderCampaignActiveBanner() {
   `;
 
   // Inserir no topo do terminal após o banner inicial, se houver
-  const welcome = terminalOutput.querySelector('.welcome-banner');
-  if (welcome && welcome.nextSibling) {
-    terminalOutput.insertBefore(bannerDiv, welcome.nextSibling);
-  } else if (terminalOutput.firstChild) {
-    terminalOutput.insertBefore(bannerDiv, terminalOutput.firstChild);
-  } else {
-    terminalOutput.appendChild(bannerDiv);
+  const out = terminalOutput || (typeof document !== 'undefined' ? document.getElementById('terminalOutput') : null);
+  if (out) {
+    const welcome = typeof out.querySelector === 'function' ? out.querySelector('.welcome-banner') : null;
+    if (welcome && welcome.nextSibling && typeof out.insertBefore === 'function') {
+      out.insertBefore(bannerDiv, welcome.nextSibling);
+    } else if (out.firstChild && typeof out.insertBefore === 'function') {
+      out.insertBefore(bannerDiv, out.firstChild);
+    } else if (typeof out.appendChild === 'function') {
+      out.appendChild(bannerDiv);
+    }
   }
 }
 
@@ -2228,6 +2327,13 @@ function openCampaignModal() {
 function closeCampaignModal() {
   const panel = document.getElementById('campaignPanel');
   if (panel) panel.hidden = true;
+  const input = document.getElementById('cliInput');
+  if (input) {
+    setTimeout(() => {
+      input.focus();
+      scrollToBottom();
+    }, 50);
+  }
 }
 
 function toggleCampaignActive(isChecked) {
@@ -2377,7 +2483,7 @@ function handleSaveCampaign(e) {
   setTimeout(() => {
     closeCampaignModal();
     if (feedback) feedback.textContent = '';
-  }, 900);
+  }, 350);
 }
 
 function deactivateCampaign() {
@@ -3145,7 +3251,9 @@ function initializeGeminiConfigPanel() {
 
   openButton.addEventListener('click', openGeminiConfigPanel);
   closeButton?.addEventListener('click', closeGeminiConfigPanel);
-  panel.querySelector('[data-gemini-close]')?.addEventListener('click', closeGeminiConfigPanel);
+  if (panel && typeof panel.querySelector === 'function') {
+    panel.querySelector('[data-gemini-close]')?.addEventListener('click', closeGeminiConfigPanel);
+  }
   form.addEventListener('submit', handleGeminiSave);
   toggleButton?.addEventListener('click', toggleGeminiKeyVisibility);
   testButton?.addEventListener('click', handleGeminiTest);
@@ -3560,15 +3668,18 @@ function escapeHTML(str) {
 
 function scrollToBottom() {
   setTimeout(() => {
-    terminalOutput.scrollTop = terminalOutput.scrollHeight;
+    const out = terminalOutput || (typeof document !== 'undefined' ? document.getElementById('terminalOutput') : null);
+    if (out) out.scrollTop = out.scrollHeight;
   }, 50);
 }
 
 function appendLog(content, className = '') {
+  const out = terminalOutput || (typeof document !== 'undefined' ? document.getElementById('terminalOutput') : null);
+  if (!out) return;
   const div = document.createElement('div');
   div.className = `log-line ${className}`;
   div.innerHTML = content;
-  terminalOutput.appendChild(div);
+  out.appendChild(div);
   scrollToBottom();
 }
 /* ==========================================================================
@@ -5460,3 +5571,58 @@ function openWhatsApp(phone, id) {
   window.open(url, '_blank', 'noopener,noreferrer');
   appendLog(`🚀 Abrindo WhatsApp para envio...`, 'log-info');
 }
+
+/* ==========================================================================
+   EXPORTAÇÃO GLOBAL DE FUNÇÕES E INICIALIZAÇÃO
+   ========================================================================== */
+if (typeof window !== 'undefined') {
+  window.startWizard = startWizard;
+  window.startBatchWizard = startBatchWizard;
+  window.openCampaignModal = openCampaignModal;
+  window.closeCampaignModal = closeCampaignModal;
+  window.handleSaveCampaign = handleSaveCampaign;
+  window.deactivateCampaign = deactivateCampaign;
+  window.applyCampaignPreset = applyCampaignPreset;
+  window.toggleServiceTag = toggleServiceTag;
+  window.updateCampaignPreview = updateCampaignPreview;
+  window.toggleCampaignActive = toggleCampaignActive;
+  window.executeCommand = executeCommand;
+  window.logoutUser = logoutUser;
+  window.showHistory = showHistory;
+  window.openGeminiConfigPanel = openGeminiConfigPanel;
+  window.closeGeminiConfigPanel = closeGeminiConfigPanel;
+  window.handleGeminiSave = handleGeminiSave;
+  window.handleGeminiRemove = handleGeminiRemove;
+  window.handleGeminiTest = handleGeminiTest;
+  window.openUserProfileModal = openUserProfileModal;
+  window.closeUserProfileModal = closeUserProfileModal;
+  window.switchProfileTab = switchProfileTab;
+  window.handleProfilePasswordChangeSubmit = handleProfilePasswordChangeSubmit;
+  window.handleProfileUpdateSubmit = handleProfileUpdateSubmit;
+  window.toggleTheme = toggleTheme;
+  window.toggleCRT = toggleCRT;
+  window.switchAuthTab = switchAuthTab;
+  window.toggleLoginPassVisibility = toggleLoginPassVisibility;
+  window.toggleRegisterPassVisibility = toggleRegisterPassVisibility;
+  window.togglePasswordInputVisibility = togglePasswordInputVisibility;
+  window.openLoginAboutModal = openLoginAboutModal;
+  window.closeLoginAboutModal = closeLoginAboutModal;
+  window.openAdminUsersPanel = openAdminUsersPanel;
+  window.closeAdminUsersPanel = closeAdminUsersPanel;
+  window.setAdminFilter = setAdminFilter;
+  window.closeAdminDetailsModal = closeAdminDetailsModal;
+  window.openWhatsApp = openWhatsApp;
+  window.copyMessageText = copyMessageText;
+  window.copyBatchItemText = copyBatchItemText;
+  window.copyAllBatchMessages = copyAllBatchMessages;
+  window.copyTextToClipboard = copyTextToClipboard;
+  window.switchToneTab = switchToneTab;
+  window.startMainApp = startMainApp;
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', startMainApp);
+  } else {
+    startMainApp();
+  }
+}
+

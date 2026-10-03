@@ -101,10 +101,10 @@
 
       <!-- Abas: Entrar vs Novo Cadastro -->
       <div class="auth-tabs" role="tablist" aria-label="Opções de Acesso">
-        <button type="button" class="auth-tab-btn active" id="tabLoginBtn" role="tab" aria-selected="true" aria-controls="loginForm">
+        <button type="button" class="auth-tab-btn active" id="tabLoginBtn" onclick="switchAuthTab('login')" role="tab" aria-selected="true" aria-controls="loginForm">
           🔑 Entrar no Sistema
         </button>
-        <button type="button" class="auth-tab-btn" id="tabRegisterBtn" role="tab" aria-selected="false" aria-controls="registerForm">
+        <button type="button" class="auth-tab-btn" id="tabRegisterBtn" onclick="switchAuthTab('register')" role="tab" aria-selected="false" aria-controls="registerForm">
           📝 Solicitar Cadastro
         </button>
       </div>
@@ -115,7 +115,7 @@
       </div>
 
       <!-- Formulário de Login -->
-      <form id="loginForm" novalidate autocomplete="on">
+      <form id="loginForm" onsubmit="handleLoginSubmit(event); return false;" novalidate autocomplete="on">
         <div class="login-field-group">
           <label class="login-label" for="loginUserInput">
             <span>✉️</span> E-mail ou Usuário de Acesso
@@ -131,7 +131,7 @@
           </label>
           <div class="login-input-wrapper password-wrapper">
             <input id="loginPassInput" type="password" autocomplete="current-password" placeholder="Digite sua senha..." required>
-            <button id="loginPassToggle" type="button" aria-label="Mostrar ou ocultar senha" title="Mostrar/Ocultar senha">👁️</button>
+            <button id="loginPassToggle" type="button" onclick="toggleLoginPassVisibility()" aria-label="Mostrar ou ocultar senha" title="Mostrar/Ocultar senha">👁️</button>
           </div>
         </div>
 
@@ -153,7 +153,7 @@
       </form>
 
       <!-- Formulário de Cadastro de Novo Usuário -->
-      <form id="registerForm" novalidate autocomplete="off" style="display: none;">
+      <form id="registerForm" onsubmit="handleRegisterSubmit(event); return false;" novalidate autocomplete="off" style="display: none;">
         <div class="login-field-group">
           <label class="login-label" for="regNameInput">
             <span>👨‍⚕️</span> Nome Completo
@@ -187,7 +187,7 @@
           </label>
           <div class="login-input-wrapper password-wrapper">
             <input id="regPassInput" type="password" autocomplete="new-password" placeholder="Defina sua senha..." minlength="6" required>
-            <button id="regPassToggle" type="button" aria-label="Mostrar ou ocultar senha" title="Mostrar/Ocultar senha">👁️</button>
+            <button id="regPassToggle" type="button" onclick="toggleRegisterPassVisibility()" aria-label="Mostrar ou ocultar senha" title="Mostrar/Ocultar senha">👁️</button>
           </div>
         </div>
 
@@ -547,28 +547,57 @@
       </div>
 
       <!-- Presets Rápidos -->
+      <!-- Presets Rápidos -->
       <div style="margin-bottom: 14px;">
-        <label class="login-label" style="margin-bottom: 8px; font-size: 0.84rem;">⚡ Presets Rápidos de Campanhas Clínicas:</label>
+        <label class="login-label" style="margin-bottom: 8px; font-size: 0.84rem;">⚡ Campanhas de Serviços Farmacêuticos Gratuitos (Selecione um Quadradinho):</label>
         <div class="campaign-preset-grid">
-          <button type="button" class="campaign-preset-card active" data-preset="cardio" onclick="applyCampaignPreset('cardio')">
+          <button type="button" class="campaign-preset-card active" data-preset="pressao" onclick="applyCampaignPreset('pressao')">
             <span class="preset-icon">🩺</span>
             <div class="preset-info">
-              <strong>Pressão & Glicemia</strong>
-              <small>Aferição gratuita</small>
+              <strong>Aferição de Pressão</strong>
+              <small>100% Gratuita</small>
+            </div>
+          </button>
+          <button type="button" class="campaign-preset-card" data-preset="glicemia" onclick="applyCampaignPreset('glicemia')">
+            <span class="preset-icon">🩸</span>
+            <div class="preset-info">
+              <strong>Teste de Glicemia</strong>
+              <small>100% Gratuito</small>
             </div>
           </button>
           <button type="button" class="campaign-preset-card" data-preset="bioimpedancia" onclick="applyCampaignPreset('bioimpedancia')">
             <span class="preset-icon">⚖️</span>
             <div class="preset-info">
               <strong>Bioimpedância</strong>
-              <small>Composição corporal</small>
+              <small>100% Gratuita</small>
             </div>
           </button>
-          <button type="button" class="campaign-preset-card" data-preset="diabetes" onclick="applyCampaignPreset('diabetes')">
-            <span class="preset-icon">🩸</span>
+          <button type="button" class="campaign-preset-card" data-preset="orientacao" onclick="applyCampaignPreset('orientacao')">
+            <span class="preset-icon">👨‍⚕️</span>
             <div class="preset-info">
-              <strong>Prevenção Diabetes</strong>
-              <small>Glicemia & cuidados</small>
+              <strong>Orientação Farmacêutica</strong>
+              <small>100% Gratuita</small>
+            </div>
+          </button>
+          <button type="button" class="campaign-preset-card" data-preset="furo" onclick="applyCampaignPreset('furo')">
+            <span class="preset-icon">👂</span>
+            <div class="preset-info">
+              <strong>Furo de Orelha</strong>
+              <small>Colocação Humanizada</small>
+            </div>
+          </button>
+          <button type="button" class="campaign-preset-card" data-preset="injetaveis" onclick="applyCampaignPreset('injetaveis')">
+            <span class="preset-icon">💉</span>
+            <div class="preset-info">
+              <strong>Aplicação Injetáveis</strong>
+              <small>Atendimento Clínico</small>
+            </div>
+          </button>
+          <button type="button" class="campaign-preset-card" data-preset="combo" onclick="applyCampaignPreset('combo')">
+            <span class="preset-icon">🌟</span>
+            <div class="preset-info">
+              <strong>Combo Saúde Completa</strong>
+              <small>Pressão + Glicemia + Bio</small>
             </div>
           </button>
           <button type="button" class="campaign-preset-card" data-preset="custom" onclick="applyCampaignPreset('custom')">
@@ -588,39 +617,41 @@
             <span>🏷️</span> Nome da Campanha
           </label>
           <div class="login-input-wrapper">
-            <input id="campaignNameInput" type="text" placeholder="Ex: Campanha de Saúde Cardiovascular & Glicemia Gratuita" required oninput="updateCampaignPreview()">
+            <input id="campaignNameInput" type="text" placeholder="Ex: Campanha de Aferição de Pressão Gratuita" required oninput="updateCampaignPreview()">
           </div>
         </div>
 
         <div class="form-row" style="margin-bottom: 12px;">
           <div class="form-group" style="margin-bottom: 0;">
             <label>⏱️ Período / Validade da Campanha:</label>
-            <input type="text" id="campaignPeriodInput" placeholder="Ex: nesta semana / até sábado às 18h / durante este mês" required oninput="updateCampaignPreview()">
+            <input type="text" id="campaignPeriodInput" placeholder="Ex: nesta semana / até sábado / durante este mês" required oninput="updateCampaignPreview()">
           </div>
           <div class="form-group" style="margin-bottom: 0;">
             <label>🩺 Ícone de Destaque:</label>
             <select id="campaignIconSelect" onchange="updateCampaignPreview()">
-              <option value="🩺">🩺 Estetoscópio / Saúde</option>
-              <option value="🩸">🩸 Glicemia / Diabetes</option>
-              <option value="⚖️">⚖️ Bioimpedância / Peso</option>
+              <option value="🩺">🩺 Pressão Arterial</option>
+              <option value="🩸">🩸 Teste de Glicemia</option>
+              <option value="⚖️">⚖️ Exame de Bioimpedância</option>
+              <option value="👨‍⚕️">👨‍⚕️ Orientação Farmacêutica</option>
+              <option value="👂">👂 Furo de Orelha / Lóbulo</option>
+              <option value="💉">💉 Aplicação de Injetáveis</option>
+              <option value="🌟">🌟 Combo Saúde / Especial</option>
               <option value="❤️">❤️ Coração / Cardiovascular</option>
-              <option value="💉">💉 Injetáveis / Vacinação</option>
-              <option value="🌟">🌟 Promoção Especial</option>
             </select>
           </div>
         </div>
 
         <div class="login-field-group">
           <label class="login-label">
-            <span>🩺</span> Serviços Gratuitos / Inclusos na Campanha:
+            <span>🩺</span> Serviços Gratuitos Inclusos (Clique nos quadradinhos para ativar/desativar):
           </label>
           <div class="campaign-tags-container" id="campaignServicesTags">
             <button type="button" class="service-chip active" data-service="Aferição de Pressão Gratuita" onclick="toggleServiceTag(this)">🩺 Aferição de Pressão Gratuita</button>
-            <button type="button" class="service-chip active" data-service="Teste de Glicemia Capilar Gratuito" onclick="toggleServiceTag(this)">🩸 Teste de Glicemia Gratuito</button>
+            <button type="button" class="service-chip" data-service="Teste de Glicemia Capilar Gratuito" onclick="toggleServiceTag(this)">🩸 Teste de Glicemia Gratuito</button>
             <button type="button" class="service-chip" data-service="Exame de Bioimpedância Gratuito" onclick="toggleServiceTag(this)">⚖️ Exame de Bioimpedância Gratuito</button>
-            <button type="button" class="service-chip" data-service="Orientação Farmacêutica Especializada" onclick="toggleServiceTag(this)">👨‍⚕️ Orientação Farmacêutica</button>
+            <button type="button" class="service-chip" data-service="Orientação Farmacêutica Especializada Gratuita" onclick="toggleServiceTag(this)">👨‍⚕️ Orientação Farmacêutica Gratuita</button>
+            <button type="button" class="service-chip" data-service="Perfuração do Lóbulo Auricular Gratuita" onclick="toggleServiceTag(this)">👂 Furo de Orelha Gratuito</button>
             <button type="button" class="service-chip" data-service="Aplicação de Injetáveis" onclick="toggleServiceTag(this)">💉 Aplicação de Injetáveis</button>
-            <button type="button" class="service-chip" data-service="Perfuração do Lóbulo Auricular" onclick="toggleServiceTag(this)">👂 Furo de Orelha</button>
           </div>
         </div>
 
