@@ -2192,6 +2192,10 @@ function saveActiveCampaign(campaign) {
   }
   if (typeof updateCampaignUIStatus === 'function') updateCampaignUIStatus();
   if (typeof renderCampaignActiveBanner === 'function') renderCampaignActiveBanner();
+  const wizBox = typeof document !== 'undefined' ? document.getElementById('wizardBox') : null;
+  if (wizBox && typeof startBatchWizard === 'function') {
+    startBatchWizard();
+  }
 }
 
 function isCampaignActive() {
@@ -3964,13 +3968,14 @@ FORMATO JSON EXATO:
 async function generateBatchMessagesSmart(items, options = {}) {
   const apiKey = getGeminiApiKey();
   const forceLocal = options.useAI === false || options.forceLocal === true;
+  const includeCampaign = options.includeCampaign !== false;
 
   if (!apiKey || forceLocal) {
     if (!apiKey && !forceLocal) {
       appendLog(`ℹ️ <strong>Gemini IA:</strong> Chave não configurada. Usando gerador anti-spam local.`, 'log-info');
     }
     return items.map((item, idx) => {
-      const res = generateUniqueAntiSpamMessage(item, idx);
+      const res = generateUniqueAntiSpamMessage({ ...item, includeCampaign }, idx);
       res.isAI = false;
       return res;
     });
@@ -3979,7 +3984,7 @@ async function generateBatchMessagesSmart(items, options = {}) {
   if (isGeminiTemporarilyBlocked()) {
     appendLog(`🛑 <strong>Gemini IA bloqueada temporariamente.</strong> Usando gerador anti-spam local de fallback.`, 'log-warning');
     return items.map((item, idx) => {
-      const res = generateUniqueAntiSpamMessage(item, idx);
+      const res = generateUniqueAntiSpamMessage({ ...item, includeCampaign }, idx);
       res.isAI = false;
       return res;
     });
@@ -3988,7 +3993,7 @@ async function generateBatchMessagesSmart(items, options = {}) {
   appendLog(`🤖 <strong>Gemini IA:</strong> Gerando mensagens personalizadas em lote para <strong>${items.length}</strong> cliente(s)...`, 'log-info');
 
   try {
-    const aiResults = await generateBatchMessagesAI(items, options);
+    const aiResults = await generateBatchMessagesAI(items, { ...options, includeCampaign });
     resetGeminiFailureState();
     appendLog(`✨ Lote processado via <strong>Gemini IA</strong> com sucesso!`, 'log-success');
     return aiResults;
@@ -3996,7 +4001,7 @@ async function generateBatchMessagesSmart(items, options = {}) {
     registerGeminiFailure(err);
     appendLog(`⚠️ <strong>Gemini IA indisponível para o lote:</strong> ${escapeHTML(err.message)} → Usando gerador anti-spam local de fallback.`, 'log-warning');
     return items.map((item, idx) => {
-      const res = generateUniqueAntiSpamMessage(item, idx);
+      const res = generateUniqueAntiSpamMessage({ ...item, includeCampaign }, idx);
       res.isAI = false;
       return res;
     });
@@ -4024,10 +4029,14 @@ function saveInlineBatchGeminiKey() {
   startBatchWizard();
 }
 
-function startBatchWizard() {
+function startBatchWizard(initialText = '') {
+  const existingInput = document.getElementById('batchInputText');
+  const textValue = initialText || (existingInput ? existingInput.value : '');
   const hasApiKey = Boolean(getGeminiApiKey());
   const isBlocked = isGeminiTemporarilyBlocked();
   const isAiActive = hasApiKey && !isBlocked;
+  const isCampActive = isCampaignActive();
+  const activeCamp = getActiveCampaign();
 
   const wizardHTML = `
     <div class="wizard-box" id="wizardBox">
@@ -4081,19 +4090,23 @@ function startBatchWizard() {
           <div class="log-dim" style="font-size: 0.78rem; margin-bottom: 6px;">
             Formato: <code>Nome | Medicamento ou Serviço | Telefone (opcional) | Sintoma/Obs (opcional)</code>
           </div>
-          <textarea id="batchInputText" rows="7" placeholder="Exemplos:&#10;Maria Silva | Amoxicilina 500mg | 11988887777 | dor de garganta&#10;Carlos Souza | Aferição de Pressão | 11977776666&#10;Ana Paula | Aplicação de Voltaren | 11966665555 | dor nas costas&#10;Roberto Lima | Losartana 50mg | 11955554444" required></textarea>
+          <textarea id="batchInputText" rows="7" placeholder="Exemplos:&#10;Maria Silva | Amoxicilina 500mg | 11988887777 | dor de garganta&#10;Carlos Souza | Aferição de Pressão | 11977776666&#10;Ana Paula | Aplicação de Voltaren | 11966665555 | dor nas costas&#10;Roberto Lima | Losartana 50mg | 11955554444" required>${escapeHTML(textValue)}</textarea>
         </div>
 
-        ${isCampaignActive() ? `
+        ${isCampActive ? `
         <div class="form-group" style="margin-bottom: 12px; padding: 10px 12px; background: rgba(0, 255, 102, 0.08); border: 1px solid rgba(0, 255, 102, 0.3); border-radius: 6px;">
           <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; color: #00ff66; font-weight: 600; margin: 0;">
             <input type="checkbox" id="batchIncludeCampaignCheckbox" checked style="accent-color: #00ff66; width: 16px; height: 16px;">
-            <span>📢 Incluir Ação de Saúde 100% Gratuita: <strong>${escapeHTML(getActiveCampaign().name)}</strong></span>
+            <span>📢 Incluir Ação de Saúde 100% Gratuita: <strong>${escapeHTML(activeCamp.name)}</strong></span>
           </label>
           <div style="font-size: 0.76rem; color: var(--text-dim); margin-top: 4px; padding-left: 24px;">
-            ✨ Destaca serviços 100% gratuitos (${escapeHTML(getActiveCampaign().services.join(', '))}) em cada mensagem personalizada gerada no lote.
+            ✨ Destaca serviços 100% gratuitos (${escapeHTML((activeCamp.services || []).join(', '))}) em cada mensagem personalizada gerada no lote.
           </div>
-        </div>` : ''}
+        </div>` : `
+        <div class="form-group" style="margin-bottom: 12px; padding: 8px 12px; background: var(--bg-card); border: 1px dashed var(--border-color); border-radius: 6px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 6px;">
+          <span class="log-dim" style="font-size: 0.78rem;">🎯 Nenhuma campanha de saúde ativa no momento.</span>
+          <button type="button" class="tool-btn" onclick="openCampaignModal()" style="font-size: 0.75rem; padding: 3px 10px; border-color: #00ff66; color: #00ff66;">+ Ativar Campanha Gratuita</button>
+        </div>`}
 
         <div class="form-actions">
           <button type="submit" id="batchSubmitBtn" class="tool-btn primary" style="background: var(--warning-color); color: #000;">🚀 Gerar Mensagens em Lote (WhatsApp Safe)</button>
