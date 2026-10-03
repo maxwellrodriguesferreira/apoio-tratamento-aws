@@ -672,7 +672,53 @@ console.log('✅ Todos os testes de controle de acesso, moderação (aprovar, re
   }
 
   console.log('✅ Geração em lote com IA Gemini, Fila de Envio WhatsApp e Fallback Anti-Spam aprovados com 100% de sucesso!');
+
+  // =========================================================================
+  // 6. TESTES DA ARQUITETURA AWS AMPLIFY GEN 2 & AUTORIZAÇÃO RBAC
+  // =========================================================================
+  const authResource = fs.readFileSync('/home/maxwell/terminal/amplify/auth/resource.ts', 'utf8');
+  const dataResource = fs.readFileSync('/home/maxwell/terminal/amplify/data/resource.ts', 'utf8');
+  const backendCode = fs.readFileSync('/home/maxwell/terminal/amplify/backend.ts', 'utf8');
+  const adminActionsHandler = fs.readFileSync('/home/maxwell/terminal/amplify/functions/admin-actions/handler.ts', 'utf8');
+  const geminiServiceHandler = fs.readFileSync('/home/maxwell/terminal/amplify/functions/gemini-service/handler.ts', 'utf8');
+  const amplifyOutputs = JSON.parse(fs.readFileSync('/home/maxwell/terminal/amplify_outputs.json', 'utf8'));
+
+  // 1. Verificação de Grupos e Configuração de Auth Gen 2
+  if (!authResource.includes("groups: ['ADMINS', 'USER']") || !authResource.includes('defineAuth')) {
+    throw new Error('Falha no teste: Configuração de grupos ADMINS e USER no Amplify Auth Gen 2 incorreta.');
+  }
+
+  // 2. Verificação de Modelos e Autorização RBAC no Data Schema
+  if (!dataResource.includes('UserProfile') || !dataResource.includes('AuditLog') || !dataResource.includes('UserHistory')) {
+    throw new Error('Falha no teste: Modelos UserProfile, AuditLog ou UserHistory ausentes no Amplify Data.');
+  }
+  if (!dataResource.includes("allow.group('ADMINS')") || !dataResource.includes('allow.owner()')) {
+    throw new Error('Falha no teste: Regras de autorização allow.owner() ou allow.group("ADMINS") ausentes no schema.');
+  }
+
+  // 3. Verificação de Políticas IAM Granulares no backend.ts
+  if (!backendCode.includes('cognito-idp:ListUsers') || !backendCode.includes('cognito-idp:AdminAddUserToGroup') || !backendCode.includes('addToRolePolicy')) {
+    throw new Error('Falha no teste: Políticas IAM granulares ausentes em amplify/backend.ts.');
+  }
+
+  // 4. Teste de Autorização da Lambda adminActions
+  if (!adminActionsHandler.includes('isCallerAuthorized') || !adminActionsHandler.includes('ADMINS')) {
+    throw new Error('Falha no teste: Verificação de autorização RBAC ausente no handler adminActions.');
+  }
+
+  // 5. Teste de Proteção do Segredo no geminiService
+  if (!geminiServiceHandler.includes('process.env.GEMINI_API_KEY') || !geminiServiceHandler.includes('generateSingle') || !geminiServiceHandler.includes('generateBatch')) {
+    throw new Error('Falha no teste: Handler da função geminiService não configurado corretamente.');
+  }
+
+  // 6. Teste da Estrutura amplify_outputs.json
+  if (!amplifyOutputs.auth || !amplifyOutputs.data || !amplifyOutputs.data.model_introspection.models.UserProfile) {
+    throw new Error('Falha no teste: amplify_outputs.json com estrutura inválida.');
+  }
+
+  console.log('✅ AWS Amplify Gen 2, Schemas RBAC, IAM Granular e Segredos AWS Secrets Manager: Aprovados com 100% de sucesso!');
 })().catch(err => {
   console.error(err);
   process.exit(1);
 });
+

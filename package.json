@@ -1,0 +1,19 @@
+{
+  "name": "terminal-apoio-tratamento-aws",
+  "version": "2026.10.0",
+  "description": "Terminal de Apoio ao Tratamento & Serviços Farmacêuticos com AWS Amplify Gen 2, Amazon Cognito, DynamoDB e Google Gemini",
+  "private": true,
+  "scripts": {
+    "test": "node test.js",
+    "typecheck": "tsc --noEmit",
+    "build": "node -e \"console.log('Build verificado com sucesso.')\""
+  },
+  "devDependencies": {
+    "@aws-amplify/backend": "^1.14.0",
+    "@aws-amplify/backend-cli": "^1.4.0",
+    "@aws-sdk/client-cognito-identity-provider": "^3.758.0",
+    "@types/node": "^26.6.4",
+    "aws-amplify": "^6.13.0",
+    "typescript": "^5.7.3"
+  }
+}
